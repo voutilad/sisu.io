@@ -12,7 +12,7 @@ enableGitInfo = true
 mainSections = ["posts", "openbsd", "neo4j", "presentations"]
 hardcodedTags = ["openbsd", "about", "archives"]
 author = "Dave Voutila"
-email = "dave@sisu.io"
+email = "hey@sisu.io"
 repoLink = "https://github.com/voutilad/sisu.io"
 description = "...so it goes."
 postcss = false
@@ -28,4 +28,4 @@ url = "https://github.com/voutilad"
 
 [[params.social]]
 icon = "linkedin"
-url = "https://linkedin.com/in/dave.voutila"
+url = "https://www.linkedin.com/in/davevoutila"

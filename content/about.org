@@ -1,0 +1,10 @@
+#+TITLE: What is this place?
+#+Description: "A bit about what I post here and who I am."
+#+Date: 2019-11-24T16:38:00-0500
+#+Tags[]: about
+
+** Who am I?
+
+- Currently a Sales Engineer @ [[https://neo4j.com][Neo4j]], the leading graph database company.
+- On and off again software engineer and [[https://github.com/sisu-llc][independent consultant]]
+- A devout [[https://github.com/voutilad/dot-emacs][Emacs lover]] having drunk the lisp kool-aide.

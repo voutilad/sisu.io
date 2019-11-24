@@ -1,6 +1,6 @@
 baseURL = "https://www.sisu.io"
 languageCode = "en-us"
-title = "A Blog to be Named Later"
+title = "sisu.io"
 theme = "bare"
 enableGitInfo = true
 
@@ -10,11 +10,11 @@ enableGitInfo = true
 
 [params]
 mainSections = ["posts", "openbsd", "neo4j", "presentations"]
-tagbar = ["OpenBSD", "Neo4j", "Archives"]
+hardcodedTags = ["openbsd", "about", "archives"]
 author = "Dave Voutila"
 email = "dave@sisu.io"
 repoLink = "https://github.com/voutilad/sisu.io"
-description = "Hackin the day away"
+description = "...so it goes."
 postcss = false
 includeAuthorInTitle = true
 

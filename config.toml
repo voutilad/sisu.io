@@ -1,6 +1,6 @@
-baseURL = "https://sisu.io"
+baseURL = "https://www.sisu.io"
 languageCode = "en-us"
-title = "Some Title"
+title = "A Blog to be Named Later"
 theme = "bare"
 enableGitInfo = true
 
@@ -9,15 +9,23 @@ enableGitInfo = true
   series = "series"
 
 [params]
-mainSections = ["random", "openbsd"]
-author = "Dave Vouitla"
-email = "hello@hello-world.com"
+mainSections = ["posts", "openbsd", "neo4j", "presentations"]
+tagbar = ["OpenBSD", "Neo4j", "Archives"]
+author = "Dave Voutila"
+email = "dave@sisu.io"
 repoLink = "https://github.com/voutilad/sisu.io"
 description = "Hackin the day away"
 postcss = false
 includeAuthorInTitle = true
-icon = ""
+
+[[params.social]]
+icon = "twitter-circle"
+url = "https://twitter.com/voutilad"
 
 [[params.social]]
 icon = "github-circle"
-url = "https://github.com/voutilad/"
+url = "https://github.com/voutilad"
+
+[[params.social]]
+icon = "linkedin"
+url = "https://linkedin.com/in/dave.voutila"

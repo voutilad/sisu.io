@@ -1,0 +1,23 @@
+baseURL = "https://sisu.io"
+languageCode = "en-us"
+title = "Some Title"
+theme = "bare"
+enableGitInfo = true
+
+[taxonomies]
+  tag = "tags"
+  series = "series"
+
+[params]
+mainSections = ["random", "openbsd"]
+author = "Dave Vouitla"
+email = "hello@hello-world.com"
+repoLink = "https://github.com/voutilad/sisu.io"
+description = "Hackin the day away"
+postcss = false
+includeAuthorInTitle = true
+icon = ""
+
+[[params.social]]
+icon = "github-circle"
+url = "https://github.com/voutilad/"

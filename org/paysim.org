@@ -1,6 +1,7 @@
 #+TITLE: Simulating Mobile Money Fraud (PaySim pt.1)
 #+DESCRIPTION: Creating a realistic data-set for analysis using PaySim
 #+DATE: 2020-02-11
+#+hugo_auto_set_lastmod: t
 #+hugo_tags: neo4j fraud java paysim
 #+hugo_base_dir: ..
 #+hugo_section: posts

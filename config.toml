@@ -4,13 +4,20 @@ title = "sisu.io"
 theme = "bare"
 enableGitInfo = true
 
+[markup]
+  [markup.highlight]
+    codeFences = true
+    lineNos = false
+    style = "github"
+
+
 [taxonomies]
   tag = "tags"
   series = "series"
 
 [params]
 mainSections = ["posts", "openbsd", "neo4j", "presentations"]
-hardcodedTags = ["openbsd", "about", "archives"]
+hardcodedTags = ["openbsd", "about", "neo4j", "archives"]
 author = "Dave Voutila"
 email = "hey@sisu.io"
 repoLink = "https://github.com/voutilad/sisu.io"

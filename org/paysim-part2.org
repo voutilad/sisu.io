@@ -1,0 +1,46 @@
+#+TITLE: Integrating PaySim with Neo4j (PaySim pt.2)
+#+DESCRIPTION: In which we look at how to leverage PaySim to build a fraud graph
+#+DATE: 2020-02-11
+#+hugo_tags: neo4j fraud java paysim
+#+hugo_base_dir: ..
+#+hugo_section: posts
+
+[[./paysim.org][Previously]], we looked at how PaySim models mobile money networks to
+simulate hidden fraudulent behavior and how my fork[fn:1] makes it
+possible to build off the original authors' work.
+
+In this post, we'll dive into the next step in building out demo:
+connecting the running simulation to a live Neo4j instance.
+
+* Prerequisites for you Home Gamers
+If you plan to follow along, here's what you'll need:
+- JDK 8 or 11[fn:2]
+- [[https://neo4j.com/download][Neo4j 3.5]] (community or enterprise)
+- Clone or download [[https://github.com/voutilad/paysim-demo][paysim-demo]]
+
+The =paysim-demo= project uses a [[https://gradle.org/][gradle]] wrapper, so you shouldn't need
+to install anything else.
+
+* Designing the Integration
+From last time, we've got an implementation of PaySim
+that....TKTKTKTKTKTKT
+
+** 1. Iteratively load PaySim Transactions
+** 2. Label our Mules
+** 3. Establish Identities and their Relationships
+** 4. Update additional Node Properties
+** 5. Thread Transactions into Chains
+
+* Tips for Bulk Loads using a Neo4j Driver
+In this case, we're using the Java Driver, but the following applies
+for any client-side data loading with Neo4j.
+
+TKTKTKT
+
+*
+
+* Footnotes
+
+[fn:2] I recommend using an OpenJDK from https://adoptopenjdk.net/
+
+[fn:1] https://github.com/voutilad/paysim

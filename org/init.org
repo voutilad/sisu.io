@@ -1,0 +1,55 @@
+#+TITLE: Config and Initialization
+#+AUTHOR: Dave Voutila
+#+EMAIL: voutilad@gmail.com
+#+PROPERTY: header-args:elisp :results output silent :tangle yes
+
+* Tangling this file
+Don't forget, it's easy: =C-c-v t=.
+
+Then: =M-x org-publish-project=
+
+* Styling and Pizazz
+
+#+BEGIN_SRC elisp
+  ;; see https://emacs.stackexchange.com/a/7633
+  (setq org-html-htmlize-output-type 'css)
+  (setq org-html-htmlize-font-prefix "org-")
+#+END_SRC
+
+* Configuring org-publish
+
+#+BEGIN_SRC elisp
+  (require 'ox-publish)
+
+  (defvar-local content-dir (expand-file-name "content" default-directory))
+  (defvar-local static-dir (expand-file-name "static" default-directory))
+  (defvar-local output-dir (expand-file-name "public" default-directory))
+
+  (setq org-publish-project-alist
+        `(("sisu-content"
+           :base-directory ,content-dir
+           :base-extension "org"
+           :publishing-directory ,output-dir
+           :recursive t
+           :publishing-function org-html-publish-to-html
+           :headline-levels 4
+           :auto-preamble t
+           :auto-sitemap t
+           :html-doctype "html5"
+           :html-html5-fancy t)
+          ("sisu-static"
+           :base-directory ,static-dir
+           :base-extension "css\\|ico\\|js\\|png\\|jpg\\|gif\\|pdf\\|txt"
+           :publishing-directory ,output-dir
+           :recursive t
+           :publishing-function org-publish-attachment)
+          ("www.sisu.io"
+           :components ("sisu-content" "sisu-static"))))
+#+END_SRC
+
+* ox-hugo
+#+BEGIN_SRC elisp
+  (use-package ox-hugo
+    :ensure t
+    :after ox)
+#+END_SRC

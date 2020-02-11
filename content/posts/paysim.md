@@ -69,7 +69,7 @@ Let's jump a bit ahead and talk about what PaySim looks like with the
 help of some graph visualizations and then dive into the core
 components: Actors and Transactions.
 
-<a id="org1e3ac0d"></a>
+<a id="org7cd36c9"></a>
 
 {{< figure src="/img/simplified-data-model.png" caption="Figure 1: Graphical representation of the PaySim data model" >}}
 
@@ -183,7 +183,7 @@ analagous to the original PaySim project, you can run the `main()`
 method in the `OriginalPaySim` class and it will write out all the
 expected output files to disk.
 
-<a id="orgcfdaa0a"></a>
+<a id="org3b57c95"></a>
 
 {{< figure src="/img/IteratingPaySim.svg" caption="Figure 2: IteratingPaySim Implementation (high-level)" >}}
 
@@ -419,7 +419,7 @@ the fraudulent account from running amock.
 We've now got a quite different data model than we originally had just
 using the vanilla PaySim project.
 
-<a id="org2d0a24e"></a>
+<a id="org229f345"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 3: Our Updated PaySim 2.1 Data Model" >}}
 

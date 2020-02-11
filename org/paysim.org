@@ -63,7 +63,7 @@ help of some graph visualizations and then dive into the core
 components: Actors and Transactions.
 
 #+CAPTION: Graphical representation of the PaySim data model
-#+NAME: fig:data-model
+#+NAME: fig:initial-data-model
 [[/img/simplified-data-model.png]]
 
 In words, using some Neo4j/Cypher terminology:
@@ -382,7 +382,7 @@ We've now got a quite different data model than we originally had just
 using the vanilla PaySim project.
 
 #+CAPTION: Our Updated PaySim 2.1 Data Model
-#+NAME: fig:data-model
+#+NAME: fig:updated-data-model
 [[/img/paysim-2.1.0.png]]
 
 It now:

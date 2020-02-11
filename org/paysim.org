@@ -396,7 +396,7 @@ run standalone or embedded. We've also got an understanding of our
 data model and how we plan on adapting it to our graph model, laying
 the foundation.
 
-In my [[./paysim-part2.org][next post]], we'll look at how to drive the PaySim implementation
+In my next post, we'll look at how to drive the PaySim implementation
 while bulk loading the transaction output into a Neo4j instance. It'll
 cover:
 

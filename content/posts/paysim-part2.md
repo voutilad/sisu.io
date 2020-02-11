@@ -2,9 +2,9 @@
 title = "Integrating PaySim with Neo4j (PaySim pt.2)"
 author = ["Dave Voutila"]
 description = "In which we look at how to leverage PaySim to build a fraud graph"
-date = 2020-02-11
+date = 2020-02-14
 tags = ["neo4j", "fraud", "java", "paysim"]
-draft = false
+draft = true
 +++
 
 [Previously]({{< relref "paysim" >}}), we looked at how PaySim models mobile money networks to

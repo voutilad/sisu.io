@@ -69,7 +69,7 @@ Let's jump a bit ahead and talk about what PaySim looks like with the
 help of some graph visualizations and then dive into the core
 components: Actors and Transactions.
 
-<a id="orga5afc63"></a>
+<a id="org1e3ac0d"></a>
 
 {{< figure src="/img/simplified-data-model.png" caption="Figure 1: Graphical representation of the PaySim data model" >}}
 
@@ -183,7 +183,7 @@ analagous to the original PaySim project, you can run the `main()`
 method in the `OriginalPaySim` class and it will write out all the
 expected output files to disk.
 
-<a id="orgeb81b57"></a>
+<a id="orgcfdaa0a"></a>
 
 {{< figure src="/img/IteratingPaySim.svg" caption="Figure 2: IteratingPaySim Implementation (high-level)" >}}
 
@@ -419,7 +419,7 @@ the fraudulent account from running amock.
 We've now got a quite different data model than we originally had just
 using the vanilla PaySim project.
 
-<a id="org007a395"></a>
+<a id="org2d0a24e"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 3: Our Updated PaySim 2.1 Data Model" >}}
 
@@ -437,7 +437,7 @@ run standalone or embedded. We've also got an understanding of our
 data model and how we plan on adapting it to our graph model, laying
 the foundation.
 
-In my [next post]({{< relref "paysim-part2" >}}), we'll look at how to drive the PaySim implementation
+In my next post, we'll look at how to drive the PaySim implementation
 while bulk loading the transaction output into a Neo4j instance. It'll
 cover:
 

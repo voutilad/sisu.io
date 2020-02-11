@@ -1,3 +1,3 @@
 [submodule "themes/bare"]
 	path = themes/bare
-	url = https://github.com/orf/bare-hugo-theme.git
+	url = https://github.com/voutilad/bare-hugo-theme.git

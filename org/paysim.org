@@ -1,54 +1,76 @@
-#+TITLE: Simulating Mobile Money Fraud (PaySim pt.1)
+#+TITLE: Simulating Mobile Money Fraud 🤑 (PaySim pt.1)
 #+DESCRIPTION: Creating a realistic data-set for analysis using PaySim
 #+DATE: 2020-02-11
+#+OPTIONS: toc:2
 #+hugo_auto_set_lastmod: t
 #+hugo_tags: neo4j fraud java paysim
 #+hugo_base_dir: ..
 #+hugo_section: posts
 
+* Introduction
 Fraud detection and investigation presents one of the most popular use
-cases for graph databases, at least in the financial services
-industry...or any industry folks are incentivized to masque or hide
-certain nefarious behavior. But for those not employed directly by a
-bank or insurance firm, it can be hard to study or experiment with
-realistic data.
+cases for graph databases, especially in the financial services
+industry. But for those not employed directly by a bank or insurance
+firm, it can be hard to study or experiment with realistic
+data. If it's not obvious, /a lack of publicly available datasets is a
+real problem for academics/ looking to develop machine learning or
+heuristic approaches to fraud detection.
 
-Turns out /a lack of publicly available datasets is a real problem for
-academics/ looking to test machine learning or heuristic approaches to
-fraud.
+/Lopez-Rojas, Elmire, and Axelsson/[fn:1] published a *PaySim*, an
+approach using an agent-based model and some anonymized, aggregate
+transactional data from a real mobile money network operator to create
+synthetic financial data sets academics and hackers can use for
+exploring ways to detect fraudulent behavior.
 
-*PaySim* looks to change that, at least for mobile money network
-providers.
+#+BEGIN_QUOTE
+Check out their initial dataset posted to kaggle:
+https://www.kaggle.com/ntnu-testimon/paysim1
+#+END_QUOTE
 
-/Lopez-Rojas, Elmire, and Axelsson/[fn:1] published a solution to take
-an agent-based model, some anonymized aggregate transactional data
-from a real mobile money network operator, and create a means of
-generating "similar" totally anonymous data programatically.
+#+CAPTION: "...fingerprints of [PaySim] transactions over time" by Arjun Joshua
+#+NAME: fig:paysim-fingerprints
+[[file:../static/img/kaggle-arjunjoshua-paysim-fingerprints.png]]
 
-* About this PaySim Series
-This is the first post of a few (2 to 3?) that will explore my
-experimentation and research into taking the open-source PaySim
-project, improving upon it, and integrating it with Neo4j to implement
-a fraud analytics platform.
+There've already been some good write-ups exploring the output of
+PaySim, both in terms of the sample dataset posted to Kaggle circa 3
+years ago and possible ML-based approaches to fraud detection like
+those of Arjun Joshua[fn:2]. Most recently, Sara Robinson[fn:3],
+[[https://sararobinson.dev/2020/01/15/fraud-detection-tensorflow.html][published an example]] using /TensorFlow/ and Google's /Cloud AI
+Platform/ to build a predictive model.
 
-In this first post I'll cover:
-- Some details on Mobile Money Networks
-- PaySim and how I've improved it
-- Initial planning of the PaySim transaction network graph
-- Adding 1st and 3rd Party Fraudsters to PaySim
+But, what's the one thing all the ML-based approaches have in common?
+*They all illustrate critical shortcomings in PaySim, specifically
+its overly simplistic modeling of a single type of fraud.* They all
+exploit the fact PaySim's logic for fraudsters is overly simplisitc.
 
-* Background: A Mobile Money Primer
+Let's see if we can improve PaySim /and/ find new ways to identify
+fraud using graphs with [[https://neo4j.com][neo4j]], shall we?
+
+#+BEGIN_QUOTE
+This is the first post of a few (maybe 3?) that will explore my
+experimentation and research taking the open-source PaySim project,
+improving upon it, and integrating it with Neo4j to implement a fraud
+analytics platform.
+#+END_QUOTE
+
+* Background: A Mobile Money Primer 💸
+To understand PaySim, we need to understand a little about what it was
+built to model, specifically a /mobile money network./
+
 Mobile money takes different forms, but in the case of PaySim it
-involves both Banks and participating Merchants. If I understand
-correctly, Merchants can take mobile payments via the network (for
-goods/services) as well as perform the function of putting money into
-the network (e.g. "topping up" an account).
+involves both Banks and participating Merchants. Merchants can take
+mobile payments via the network (for goods/services) as well as
+perform the function of putting money into the network (e.g. "topping
+up" an account).
+
+If it sounds a lot like /Apple Pay/, it's because mobile payment
+services are effectively a type of mobile money.
 
 The mobile money network used by the PaySim authors comes from an
 undisclosed African country, which leads me to believe it's of the
-sort similar to M-Pesa: https://en.wikipedia.org/wiki/M-Pesa
+sort similar to [[https://en.wikipedia.org/wiki/M-Pesa][M-Pesa]].
 
-From the above Wikipedia page:
+From the M-Pesa Wikipedia page:
 
 #+BEGIN_QUOTE
 M-Pesa is a branchless banking service; M-Pesa customers can deposit
@@ -56,63 +78,90 @@ and withdraw money from a network of agents that includes airtime
 resellers and retail outlets acting as banking agents.
 #+END_QUOTE
 
-* An Overview of PaySim
-So what exactly is PaySim? What is it modeling?
+So consider it something like /Apple Pay/, but where you can also make
+deposits via participating merchants.
 
-Let's jump a bit ahead and talk about what PaySim looks like with the
-help of some graph visualizations and then dive into the core
-components: Actors and Transactions.
+* An Overview of PaySim
+If PaySim models financial transactions, what does it look like and
+how does it work?
+
+Let's jump a bit ahead and talk about what PaySim produces with the
+help of a graph visualization and then dive into the core components
+of the simulation: /Agents and Transactions./
 
 #+CAPTION: Graphical representation of the PaySim data model
 #+NAME: fig:initial-data-model
-[[/img/simplified-data-model.png]]
+[[file:../static/img/simplified-data-model.png]]
 
-In words, using some Neo4j/Cypher terminology:
+PaySim is a multiagent simulation, that steps through time, where
+during each step the agents are allowed to act in ways that can change
+themselves and the rest of the simulation state. If this sounds
+confusing at first, PaySim functions with a single core axiom:
 
-- *Clients* =:PERFORM= /zero or many/ Transactions where credits or
-  debits apply from their balance =:TO= another agent's balance.
+#+BEGIN_QUOTE
+=Clients= perform /zero or many/ =Transactions= at each step in time,
+exchanging money with other agents in the network, specifically
+=Banks=, =Merchants=, and other =Clients=.
+#+END_QUOTE
 
-- *Transactions* occur ordered in time for each Client performing
-  them, where each *Transaction* may be the =:FIRST_TX= or =:LAST_TX=
-  performed by a *Client*.
+Let's look a bit closer at both the types of Agents and the types of
+Transactions that PaySim simulates.
 
-- When *Clients* perform /two or more/ Transactions, since they
-  happen sequentially, you can order them by time in a sequence where
-  all but the =:LAST_TX= has a =:NEXT= Transaction in the chain.
+** 🎭 Agent Types
+Agents are the key actors, meaning they can perform actions in the
+simulation. There are three (3) primary agent types and a few subtypes
+as well.
 
-** About Agent Types
-Agents are the key actors in the simulation and take one of a variety
-of forms:
+*** 💳 Clients
+Clients model the end users in the mobile money network, effectively
+mapping to unique accounts that, in theory, are controlled by real
+people. Since Clients model people, and we're concerned about modeling
+fraud, it follows that not all people in our simulation behave the
+same way. (Surprise, surprise!)
 
-- *Clients* are end users in the money network, mapping effectively to
-  someone or someone's phone, credit card, etc. and come in different types:
-  + Some clients are *Fraudsters* and manipulate the network,
-  + Some clients act solely as *Mules*,
-  + But most are regular accounts, behaving normally!
+- Some clients are *Fraudsters* and manipulate the network and other
+  clients to their own gain
+- Some clients act solely as *Mules*, a means of moving money around
+  and ultimately out of the network
+- Most are clients just behave normally in how they conduct
+  transactions, like good members of the community
 
-- *Merchants* are businesses that conduct transactions with *Clients*
-  + In a mobile money network, *Merchants* also act as a gateway to
-    get assets into and out of the network.
-  + But they can also provide goods/services in exchange for money in
-    the network.
+*** 🏬 Merchants
+Merchants model the vendors or businesses that participate in the
+network through interactions with Clients.
 
-- *Banks* are...banks! (Pretty simple.)
+- Merchants act as a gateway to the network, allowing assets to flow
+  into and out of the network
+- Merchants provide goods/services in exchange for money in the
+  network like a traditional vendor
 
-** Transaction Types
-Clients are the sole agents that can perform Transactions. There are
-five (5) primary types of transactions a Client can perform and each
-must follow certain rules:
+*** 🏦 Banks
+Banks are pretty inert in PaySim, acting only as a target for Debit
+transactions. They appear to play a relatively limited role PaySim,
+probably due to not being a critical component of the mobile money
+network PaySim models. (Consider, for example, the point that some
+mobile money networks exist in a market because its consituents are
+"under banked.")
 
-- Each *Transaction* requires a second agent of a particular type
-  dependent on the type of Transaction
+The only role Banks play is to facilitate /Debit/ transactions, which
+seem more to be a debit against a client's balance in the network as
+if they're transfering money back into their actual bank account.
 
-- Only *Transfers* between Clients require proper double-entry
-  bookkeeping where there's a zero-sum, meaning Banks and Merchants
-  are ingress/egress points.
+** Transactions
+Transactions form the cornerstone of PaySim that they're the only real
+way client can interact with other agents. In fact, clients are the
+only agents that perform transactions.
 
-- *Transfers* can occur up to some global transfer limit set in the
-  simulation parameters.
+#+BEGIN_QUOTE
+While in the real world a financial transaction could occur initiated
+by banks, merchants, etc., PaySim focuses entirely on the behavior of
+the Clients.
+#+END_QUOTE
 
+What can a Client do each turn in the simulation? They have a choice
+of five (5) possible transactions:
+
+#+NAME: Transaction Types
 #+CAPTION: Table of Transaction Types
 | Transaction | Description                                            |
 |-------------+--------------------------------------------------------|
@@ -123,31 +172,76 @@ must follow certain rules:
 | Payment     | A Client exchanges money for something from a Merchant |
 |-------------+--------------------------------------------------------|
 
-* Making PaySim Play Nice
-PaySim is provided as a Java application built upon the MASON agent
-simulation framework[fn:2]. It's got a few shortcomings we need to
-overcome before we can easily build a demo that will generate our graph:
+Depending on the type of transaction, certain rules apply:
 
-1. It expects to write out simulation results as CSV files. While
-   Neo4j natively supports loading csv[fn:3], loading the transactions
-   on the fly would open a lot more demo possibilities like simulating
+- Every transaction must have a second agent of a supported type,
+  dependent on the type of transaction.
+
+- Only *Transfers* between clients require proper double-entry
+  bookkeeping where there's a zero-sum. /(Corollary: the simulation's
+  money supply can be increased/decreased via Merchants and Banks.)/
+
+- *Transfers* amounts must fall under a /global transfer limit/ set in
+  the simulation parameters prior to simulation start. For larger
+  transfers, they must be broken into multiple transactions.
+
+** Step by Step (day by day?)
+The last thing to note about PaySim (and then you'll be a PaySim
+expert!), is that the simulation runs in discrete steps. At every
+"step", each agent (in some deterministic order) gets an opportunity
+to act.
+
+In the case of PaySim:
+
+- Each "step" corresponds to *one (1) hour* of time
+- Agents, specifically Clients, may act *zero or many times* per step
+- Internal limitations cap PaySim at *720 steps* or *30 days* of
+  simulated time[fn:4]
+
+* 👷‍ Improving PaySim
+You can run it as-is, out of the box, and
+generate synthetic data, so why not just use it now to explore fraud
+and build our graph? Well...
+
+1. PaySim expects to write out simulation results as CSV files. While
+   Neo4j natively supports loading csv[fn:5], loading the transactions
+   on the fly would open a lot more possibilities like simulating
    real-time detection and action.
 
-2. Transactions in the original PaySim contain some bare bones data,
-   with some critical aspects left to be inferred.
+2. Transactions in PaySim contain only bare bones data, with some
+   critical aspects left to be inferred.
 
-3. The original PaySim never explicitly documents all the actors in a
-   simulation run, leaving you to infer their details from the raw
-   transaction output.
+3. PaySim never explicitly documents all the actors in a simulation
+   run, leaving you to infer their details from the raw transaction
+   output. (In the code, however, it does keep track of all agents.)
 
-What do we do in open-source when we want things improved? No, it's
-not open a dozen issues in Github...it's called fork it and do it
-yourself! As such, PaySim is provided under the GPLv3 and my fork is available
-at https://github.com/voutilad/PaySim.
+SO! *What do we do in open-source when we want things improved?*
 
-Now let's talk about addressing the embeddability issues.
+No, it's not open a dozen issues in Github...it's called *fork it* and
+do it yourself![fn:6]
 
-** Making PaySim more of a Library than an App
+Let's break it down into two parts:
+- improving ergnomics and usability of PaySim, allowing us to enhance
+  it and add new features
+- expanding upon the modeling of Fraudsters, incorporating the two
+  common types of fraudsters: 1st and 3rd party
+
+If you're not interested in some of the lower-level code changes, jump
+ahead to [[Enhancing PaySim's Fraudsters]].
+
+** ⬆ Code Upgrades
+PaySim is provided as a Java application built upon the MASON agent
+simulation framework[fn:7], a mature and proven kitchen-sink
+multi-agent simulation platform. However, the way PaySim was
+implemented by the authors makes it challenging to build upon and
+expand.
+
+#+BEGIN_QUOTE
+Here I'll provide a high level overview of improvements in my
+fork of PaySim available at https://github.com/voutilad/paysim
+#+END_QUOTE
+
+*** Making PaySim more of a Library than an App
 First up is fixing PaySim's desire to only output to the file
 system. There are two primary improvements I made to make PaySim
 embeddable as a library:
@@ -168,16 +262,16 @@ expected output files to disk.
 
 #+CAPTION: IteratingPaySim Implementation (high-level)
 #+NAME: fig:iteratingpaysim
-[[/img/IteratingPaySim.svg]]
+[[file:../static/img/IteratingPaySim.svg]]
 
 If instead you want to drive the simulation using an implementation of
 a Java =Iterator<org.paysim.base.Transaction>=, use the
 =IteratingPaySim= class and consume transactions sequentially. A
 worker thread drives the simulation in the background while data flows
-via an buffered implementation of a =java.util.ArrayDeque=[fn:6]. (The
+via an buffered implementation of a =java.util.ArrayDeque=[fn:8]. (The
 nitty gritty details are beyond the scope of this post at the moment.)
 
-** Improving PaySim Transactions & History
+*** Improving PaySim Transactions & History
 This part is a relatively simple change as to keep compatibility with
 the original PaySim logic I've kept the =Transaction= implementation
 relatively the same, with the key exception of adding in details about
@@ -198,59 +292,62 @@ By tracking the =SuperActor.Type= on the =Transaction=:
    instances either in PaySim's tracking of Clients/Merchants/Banks or
    in our resulting database.
 
-** Other Miscelanneous Housekeeping
+*** Other Miscelanneous Housekeeping
 I made various touchups and tweaks that are too in-the-weeds for this
 blog post when overhauling the core of PaySim, so if you're interested
 make sure to check out the project's [[https://github.com/voutilad/PaySim#why-fork][README]] for some more details.
 
+** Enhancing PaySim's Fraudsters
+If we relax our view of PaySim's mobile money network approach and let
+it instead model just any transaction based financial network, can we
+expand to include different types of fraud?
 
-* Going beyond PaySim 2.0
-If we relax our view of PaySim a little, i.e. take the mobile money
-network approach and let it instead model just any transaction based
-financial network, can we expand to include different types of fraud?
-
-** The Original PaySim Fraudster Behavior
+*** The Original PaySim Fraudster Behavior
 PaySim as-is only models what looks to be a form of 3rd-party fraud:
 
 1. Fraudsters target an established Client account (the victim)
 2. Fraudsters trigger Transfers from that victim to a Mule account the
    Fraudster creates
-3. When the Mule has a certain balance level it performs a "CashOut"
+3. When the Mule has a certain balance level it performs a =CashOut=
 
 A manifestation of this might be someone breaching someone's mobile
 money account via credential skimming/theft or phishing. Once the
 Fraudster has access to the payment card they can cash out by buying
-instruments like gift cards or prepaid cards that can in turn either
-be used or sold to convert to actual cash.
+gift cards or prepaid cards that can in turn either be used or sold to
+convert to actual cash.
 
-It's got some basis in the real-world, but can we make it a tad more
-realistic? Where could we improve?
+It's got some basis in the real-world, /but can we make it a tad more
+realistic?/
 
 - Fraudsters try to completely drain a Victim's account, performing
   Transfers up to the network "transfer limit" set by the model
-  parameters. In real world credit card fraud, cards are usually
+  parameters. /In real world credit card fraud, cards are usually
   "tested" through small transactions or pre-authorization before
-  being used for big purchases.
+  being used for big purchases./
+
 - A PaySim Fraudster picks a Victim from the simulation universe at
   random. In the real world, while there's some behavior that may
-  appear random, usually Fraudsters breach or compromise a Merchant's
+  appear random, /Fraudsters often breach or compromise a Merchant's
   POS systems (both offline and online) to initially gain access to
-  Victim accounts.
+  victims' accounts./
 
-Lastly, the above is all about 3rd-party fraud: what about 1st-party?
+Lastly, the above is all about 3rd-party fraud: /what about
+1st-party?/
+
 Typically 1st-party involves some level of credit building, and our
 mobile money network isn't exactly a credit network. Still, we can
 pretend!
 
-** Improving 3rd Party Fraudsters
+*** Improving 3rd Party Fraudsters
 We'll enhance our 3rd-party Fraudsters to incorporate a few new
-behaviors:
+behaviors bringing it closer to realistic behavior:
 
-- Support storing "favored" Merchants that the Fraudster will use as a
-  means of targeting Clients for victimization
-- Keep track of Victims
+- To simulate merchant breaches, card skimming, etc., support storing
+  "favored" Merchants that the Fraudster will use as a means of
+  targeting Clients for victimization
+- Keep track of fraud victims, the easiest target of future fraud
 - For new Victims, try making "test charges" simulating real world
-  card testing
+  card testing[fn:11]
 
 Like the original PaySim, we'll keep the idea that a 3rd-party
 Fraudster creates a Mule account.
@@ -262,7 +359,7 @@ events:
    abort actions for this simulation step.
 
 2. If there are no victims /OR/ we pass a probability check for
-   picking a new victim (=P_NEW_VICTIM=), we enter New Victim mode:
+   picking a new victim, we enter New Victim mode:
    * Pick a Merchant at random from favored merchants.
    * Pick a Client via the Merchant history at random /OR/ if there is
      no favorted Merchant, pick a random Client from the universe.
@@ -274,27 +371,40 @@ events:
 3. Otherwise, pick an existing Victim at random and try a "Transfer"
    of some percentage of the Client balance to a Mule.
 
+#+BEGIN_QUOTE
 See the [[https://github.com/voutilad/PaySim/blob/master/src/main/java/org/paysim/actors/ThirdPartyFraudster.java][ThirdPartyFraudster]] class in the code base for implementation
 details.
+#+END_QUOTE
 
-** 1st Party Fraudsters
-First Party Fraud typically entails using partially or completely fake
-identities in order to establish some form of credit with no intent to
-fulfill any debts. (See the definition in [[https://www.openriskmanual.org/wiki/First_Party_Fraud][Open Risk Manual]].) But,
-PaySim doesn't have any form of identities!
+*** 1st Party (Synthetic) Fraudsters
+First Party Fraud typically entails misrepresenting oneself in order
+to establish a line of credit with no intent to fulfill any
+debts. (See the definition in [[https://www.openriskmanual.org/wiki/First_Party_Fraud][Open Risk Manual]].)
 
-If we bend our definition of the payment network being modeled by
-PaySim, adding identities is pretty easy, but requires a bit of an
-overhaul across the actor codebase. We ultimately needs all Clients,
-whether Fraudsters, Mules, or regular, to have some identifiable
-details that are generally unique.
+A more interesting form of fraud is [[https://www.datavisor.com/wiki/synthetic-identity-theft/][synthetic identity fraud]] where
+instead of using their own identifying information, fraudsters mix
+real with fake identifiers in order to slip past fraud checks when
+opening accounts or getting credit lines.
+
+Should be easy to add to PaySim, /but PaySim doesn't have any form of
+identities!/
+
+First, we'll have to bend our definition of the payment network being
+modeled by PaySim and assume some of it involves lines of credit.
+
+Next, adding identities is pretty easy, but requires a bit of an
+overhaul across the agent (actor) codebase: we ultimately needs all
+Clients, whether Fraudsters, Mules, or regular, to have some
+identifiable details that are generally unique.
 
 *** Modeling Identities
-From a graph perspective, there's a pretty trivial way to incorporate
-identities with Clients: relate each Client to an instance of an
-Identity.
+What should it look like in the end? From a graph perspective, there's
+a pretty trivial way to incorporate identities with Clients: relate
+each Client to an instance of an Identity.
 
-**INSERT IMAGE**
+#+CAPTION: Pretty simple model: Client's have one or many identifiers
+#+NAME: fig:sample-identity-model
+[[file:../static/img/simple-identity-model.png]]
 
 From the PaySim code perspective, it gets a bit trickier, and easily
 can turn into a [[https://en.wikipedia.org/wiki/Law_of_triviality][bike shedding]] exercise. Here's where I ended up:
@@ -321,7 +431,7 @@ can turn into a [[https://en.wikipedia.org/wiki/Law_of_triviality][bike shedding
     of PaySim, it can take a seed and produce deterministic results,
     which is key to keeping PaySim reproducable.
 
-- Finally, constructors for actors get overhauled to optionally take a
+- Constructors for actors get overhauled to optionally take a
   reference to an =Identity= implementation /OR/ will generate one if
   not provided.
 
@@ -351,7 +461,7 @@ implementation:
    transferring its balance to the fraudster's designated Mule.
 5. Profit.
 
-From an Java implementation standpoint[fn:4], it's pretty short and sweet:
+From Java implementation standpoint[fn:9], it's pretty short and sweet:
 
 #+BEGIN_SRC java
   @Override
@@ -384,7 +494,7 @@ using the vanilla PaySim project.
 
 #+CAPTION: Our Updated PaySim 2.1 Data Model
 #+NAME: fig:updated-data-model
-[[/img/paysim-2.1.0.png]]
+[[file:../static/img/paysim-2.1.0.png]]
 
 It now:
 - provides identifiers (e.g. =Phone=) for each Client account
@@ -401,7 +511,7 @@ In my next post, we'll look at how to drive the PaySim implementation
 while bulk loading the transaction output into a Neo4j instance. It'll
 cover:
 
-- Leveraging the Neo4j Java Driver[fn:5] to load PaySim Transactions
+- Leveraging the Neo4j Java Driver[fn:10] to load PaySim Transactions
   on the fly as the simulation runs
 - Best practices in batch/bulk data loading to get high throughput
 - Threading transactions into event chains and why that's helpful for
@@ -411,12 +521,31 @@ A final post (TBD) will dive into how to analyze the data from both a
 visual perspective as well as an algorithmic approach.
 
 * Footnotes
-Note: If viewing this org file in a site like Github, footnotes
-probably don't rendor properly. Just a heads up!
 
 [fn:1] [[https://www.researchgate.net/publication/313138956_PAYSIM_A_FINANCIAL_MOBILE_MONEY_SIMULATOR_FOR_FRAUD_DETECTION][PaySim:A Financial Mobile Money Simulator For Fraud Detection]]
-[fn:2] See the MASON project's home page: https://cs.gmu.edu/~eclab/projects/mason/
-[fn:3] https://neo4j.com/developer/guide-import-csv/
-[fn:4] https://github.com/voutilad/PaySim/blob/3cfb56d0d52e45157f387144e8a4d0be7bcb7850/src/main/java/org/paysim/actors/FirstPartyFraudster.java#L44
-[fn:5] https://github.com/neo4j/neo4j-java-driver
-[fn:6] https://docs.oracle.com/javase/8/docs/api/java/util/ArrayDeque.html
+
+[fn:2] See Arjun's Kaggle notebook here:  https://www.kaggle.com/arjunjoshua/predicting-fraud-in-financial-payment-services
+
+[fn:3] Sara is a Developer Advocate for Google Cloud. You can find her
+blog at https://sararobinson.dev/
+
+[fn:4] This is due to PaySim using aggregate data to drive the
+simulation and the data provided (by the original authors) only covers
+30 days. Modifying this data will allow PaySim to produce different
+outcomes of differing lengths.
+
+[fn:5] https://neo4j.com/developer/guide-import-csv/
+
+[fn:6] As such, PaySim is provided under the GPLv3 and my fork is
+available at https://github.com/voutilad/PaySim.
+
+[fn:7] See the MASON project's home page: https://cs.gmu.edu/~eclab/projects/mason/
+
+[fn:8] https://docs.oracle.com/javase/8/docs/api/java/util/ArrayDeque.html
+
+[fn:11] See Stripe's docs on how they define "card testing"
+https://stripe.com/docs/card-testing
+
+[fn:9] https://github.com/voutilad/PaySim/blob/3cfb56d0d52e45157f387144e8a4d0be7bcb7850/src/main/java/org/paysim/actors/FirstPartyFraudster.java#L44
+
+[fn:10] https://github.com/neo4j/neo4j-java-driver

@@ -3,7 +3,7 @@ title = "Simulating Mobile Money Fraud 🤑 (PaySim pt.1)"
 author = ["Dave Voutila"]
 description = "Creating a realistic data-set for analysis using PaySim"
 date = 2020-02-11
-lastmod = 2020-02-13T08:13:28-05:00
+lastmod = 2020-02-13T08:13:47-05:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -49,7 +49,7 @@ exploring ways to detect fraudulent behavior.
 > Check out their initial dataset posted to kaggle:
 > <https://www.kaggle.com/ntnu-testimon/paysim1>
 
-<a id="orgcb33004"></a>
+<a id="org08abe36"></a>
 
 {{< figure src="/img/kaggle-arjunjoshua-paysim-fingerprints.png" caption="Figure 1: \"...fingerprints of [PaySim] transactions over time\" by Arjun Joshua" >}}
 
@@ -111,7 +111,7 @@ Let's jump a bit ahead and talk about what PaySim produces with the
 help of a graph visualization and then dive into the core components
 of the simulation: _Agents and Transactions._
 
-<a id="orgc438f3a"></a>
+<a id="org14e69a3"></a>
 
 {{< figure src="/img/simplified-data-model.png" caption="Figure 2: Graphical representation of the PaySim data model" >}}
 
@@ -297,7 +297,7 @@ analagous to the original PaySim project, you can run the `main()`
 method in the `OriginalPaySim` class and it will write out all the
 expected output files to disk.
 
-<a id="orgff94593"></a>
+<a id="org6119ed3"></a>
 
 {{< figure src="/img/IteratingPaySim.svg" caption="Figure 3: IteratingPaySim Implementation (high-level)" >}}
 
@@ -451,7 +451,7 @@ What should it look like in the end? From a graph perspective, there's
 a pretty trivial way to incorporate identities with Clients: relate
 each Client to an instance of an Identity.
 
-<a id="org97e5e19"></a>
+<a id="orge217aba"></a>
 
 {{< figure src="/img/simple-identity-model.png" caption="Figure 4: Pretty simple model: Client's have one or many identifiers" >}}
 
@@ -548,7 +548,7 @@ the fraudulent account from running amock.
 We've now got a quite different data model than we originally had just
 using the vanilla PaySim project.
 
-<a id="org2a3b987"></a>
+<a id="org0d392d7"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 5: Our Updated PaySim 2.1 Data Model" >}}
 

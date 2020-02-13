@@ -3,7 +3,7 @@ title = "Simulating Mobile Money Fraud 🤑 (PaySim pt.1)"
 author = ["Dave Voutila"]
 description = "Creating a realistic data-set for analysis using PaySim"
 date = 2020-02-11
-lastmod = 2020-02-12T17:35:02-05:00
+lastmod = 2020-02-13T08:13:28-05:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -49,7 +49,7 @@ exploring ways to detect fraudulent behavior.
 > Check out their initial dataset posted to kaggle:
 > <https://www.kaggle.com/ntnu-testimon/paysim1>
 
-<a id="org624956e"></a>
+<a id="orgcb33004"></a>
 
 {{< figure src="/img/kaggle-arjunjoshua-paysim-fingerprints.png" caption="Figure 1: \"...fingerprints of [PaySim] transactions over time\" by Arjun Joshua" >}}
 
@@ -111,7 +111,7 @@ Let's jump a bit ahead and talk about what PaySim produces with the
 help of a graph visualization and then dive into the core components
 of the simulation: _Agents and Transactions._
 
-<a id="orgc290354"></a>
+<a id="orgc438f3a"></a>
 
 {{< figure src="/img/simplified-data-model.png" caption="Figure 2: Graphical representation of the PaySim data model" >}}
 
@@ -250,20 +250,16 @@ and build our graph? Well...
     run, leaving you to infer their details from the raw transaction
     output. (In the code, however, it does keep track of all agents.)
 
-SO! **What do we do in open-source when we want things improved?**
+**What do we do in open-source when we want things improved?** No, it's
+not open a dozen issues in Github...it's called **fork it** and try
+doing it yourself.[^fn:6]
 
-No, it's not open a dozen issues in Github...it's called **fork it** and
-do it yourself![^fn:6]
-
-Let's break it down into two parts:
+The changes we need to make break down into two parts:
 
 -   improving ergnomics and usability of PaySim, allowing us to enhance
     it and add new features
 -   expanding upon the modeling of Fraudsters, incorporating the two
     common types of fraudsters: 1st and 3rd party
-
-If you're not interested in some of the lower-level code changes, jump
-ahead to [Enhancing PaySim's Fraudsters](#enhancing-paysim-s-fraudsters).
 
 
 ### ⬆ Code Upgrades {#code-upgrades}
@@ -274,8 +270,11 @@ multi-agent simulation platform. However, the way PaySim was
 implemented by the authors makes it challenging to build upon and
 expand.
 
-> Here I'll provide a high level overview of improvements in my
-> fork of PaySim available at <https://github.com/voutilad/paysim>
+> Here I'll provide a high level overview of code improvements in my
+> fork of PaySim available at <https://github.com/voutilad/paysim>.
+>
+> If you're not interested in some of the lower-level code changes, jump
+> ahead to [Enhancing PaySim's Fraudsters](#enhancing-paysim-s-fraudsters).
 
 
 #### Making PaySim more of a Library than an App {#making-paysim-more-of-a-library-than-an-app}
@@ -298,7 +297,7 @@ analagous to the original PaySim project, you can run the `main()`
 method in the `OriginalPaySim` class and it will write out all the
 expected output files to disk.
 
-<a id="org88042c5"></a>
+<a id="orgff94593"></a>
 
 {{< figure src="/img/IteratingPaySim.svg" caption="Figure 3: IteratingPaySim Implementation (high-level)" >}}
 
@@ -347,7 +346,7 @@ it instead model just any transaction based financial network, can we
 expand to include different types of fraud?
 
 
-#### The Original PaySim Fraudster Behavior {#the-original-paysim-fraudster-behavior}
+#### 😏 The Original PaySim Fraudster Behavior {#the-original-paysim-fraudster-behavior}
 
 PaySim as-is only models what looks to be a form of 3rd-party fraud:
 
@@ -419,11 +418,11 @@ events:
 3.  Otherwise, pick an existing Victim at random and try a "Transfer"
     of some percentage of the Client balance to a Mule.
 
-> See the [ThirdPartyFraudster](https://github.com/voutilad/PaySim/blob/master/src/main/java/org/paysim/actors/ThirdPartyFraudster.java) class in the code base for implementation
+> See [ThirdPartyFraudster.java](https://github.com/voutilad/PaySim/blob/master/src/main/java/org/paysim/actors/ThirdPartyFraudster.java) in the code base for implementation
 > details.
 
 
-#### 1st Party (Synthetic) Fraudsters {#1st-party--synthetic--fraudsters}
+#### 🎭 1st Party (Synthetic) Fraudsters {#1st-party--synthetic--fraudsters}
 
 First Party Fraud typically entails misrepresenting oneself in order
 to establish a line of credit with no intent to fulfill any
@@ -452,7 +451,7 @@ What should it look like in the end? From a graph perspective, there's
 a pretty trivial way to incorporate identities with Clients: relate
 each Client to an instance of an Identity.
 
-<a id="orgc7622c5"></a>
+<a id="org97e5e19"></a>
 
 {{< figure src="/img/simple-identity-model.png" caption="Figure 4: Pretty simple model: Client's have one or many identifiers" >}}
 
@@ -549,7 +548,7 @@ the fraudulent account from running amock.
 We've now got a quite different data model than we originally had just
 using the vanilla PaySim project.
 
-<a id="org47e6a52"></a>
+<a id="org2a3b987"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 5: Our Updated PaySim 2.1 Data Model" >}}
 

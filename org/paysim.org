@@ -215,19 +215,15 @@ and build our graph? Well...
    run, leaving you to infer their details from the raw transaction
    output. (In the code, however, it does keep track of all agents.)
 
-SO! *What do we do in open-source when we want things improved?*
+*What do we do in open-source when we want things improved?* No, it's
+not open a dozen issues in Github...it's called *fork it* and try
+doing it yourself.[fn:6]
 
-No, it's not open a dozen issues in Github...it's called *fork it* and
-do it yourself![fn:6]
-
-Let's break it down into two parts:
+The changes we need to make break down into two parts:
 - improving ergnomics and usability of PaySim, allowing us to enhance
   it and add new features
 - expanding upon the modeling of Fraudsters, incorporating the two
   common types of fraudsters: 1st and 3rd party
-
-If you're not interested in some of the lower-level code changes, jump
-ahead to [[Enhancing PaySim's Fraudsters]].
 
 ** ⬆ Code Upgrades
 PaySim is provided as a Java application built upon the MASON agent
@@ -237,8 +233,11 @@ implemented by the authors makes it challenging to build upon and
 expand.
 
 #+BEGIN_QUOTE
-Here I'll provide a high level overview of improvements in my
-fork of PaySim available at https://github.com/voutilad/paysim
+Here I'll provide a high level overview of code improvements in my
+fork of PaySim available at https://github.com/voutilad/paysim.
+
+If you're not interested in some of the lower-level code changes, jump
+ahead to [[Enhancing PaySim's Fraudsters]].
 #+END_QUOTE
 
 *** Making PaySim more of a Library than an App
@@ -302,7 +301,7 @@ If we relax our view of PaySim's mobile money network approach and let
 it instead model just any transaction based financial network, can we
 expand to include different types of fraud?
 
-*** The Original PaySim Fraudster Behavior
+*** 😏 The Original PaySim Fraudster Behavior
 PaySim as-is only models what looks to be a form of 3rd-party fraud:
 
 1. Fraudsters target an established Client account (the victim)
@@ -372,11 +371,11 @@ events:
    of some percentage of the Client balance to a Mule.
 
 #+BEGIN_QUOTE
-See the [[https://github.com/voutilad/PaySim/blob/master/src/main/java/org/paysim/actors/ThirdPartyFraudster.java][ThirdPartyFraudster]] class in the code base for implementation
+See [[https://github.com/voutilad/PaySim/blob/master/src/main/java/org/paysim/actors/ThirdPartyFraudster.java][ThirdPartyFraudster.java]] in the code base for implementation
 details.
 #+END_QUOTE
 
-*** 1st Party (Synthetic) Fraudsters
+*** 🎭 1st Party (Synthetic) Fraudsters
 First Party Fraud typically entails misrepresenting oneself in order
 to establish a line of credit with no intent to fulfill any
 debts. (See the definition in [[https://www.openriskmanual.org/wiki/First_Party_Fraud][Open Risk Manual]].)

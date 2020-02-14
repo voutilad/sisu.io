@@ -542,7 +542,7 @@ To me this feels like an improvement. Let's now put it to work and
 simulate some fraud!
 
 * Next Episode: Getting PaySim Transactions into Neo4j
-In my next post, we'll look at how to configure and run a PaySim
+In my [[file:paysim-part2.org][next post]], we'll look at how to configure and run a PaySim
 simulation while simultaneously bulk loading the transaction output
 into a live Neo4j instance. We'll cover:
 

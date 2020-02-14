@@ -1,7 +1,7 @@
 #+TITLE: Integrating PaySim with Neo4j 🔌 (PaySim pt.2)
 #+DESCRIPTION: In which we look at how to leverage PaySim to build a fraud graph
-#+DATE: 2020-02-13
-#+OPTIONS: toc:1
+#+DATE: 2020-02-14
+#+OPTIONS: toc:2
 #+hugo_auto_set_lastmod: t
 #+hugo_tags: neo4j fraud java paysim
 #+hugo_base_dir: ..
@@ -476,7 +476,7 @@ Let's get down to business and run that code, shall we?
 Assuming you've got the project cloned or downloaded and all the
 [[Prerequisites for you Home Gamers][prerequisites]] in place, you can follow along.
 
-** Build the Demo Project
+** Building the Demo Project
 This part is easy thanks to the Gradle wrapper.
 
 On macOS or *nix systems (with =unzip= available):
@@ -515,33 +515,152 @@ program to unpack the resulting tar file.
 
 ** Tweak our Simulation Parameters
 Now that we've got the demo built and unpacked, let's set the
-parameters of our simulation.
+parameters of our simulation. Ultimately there are five (5) types of
+levers we can push/pull to change the simulation outcome:
 
-** Stage our Database
-If you use the default simulation parameters, you'll be producing a
-graph with approximately:
+- *seed* for the random number generator
+- *nbSteps* for the total number of steps to simulate
+- *nb[Clients/Fraudsters/Merchants/Banks]* for setting the population sizes
+- *multiplier* to scale the number of clients, fraudsters, and
+  merchants by a factor of the multiplier (quick way to double or
+  increase the population an order of magnitude)
+- *fraudProbability* is the chance a Fraudster decides at a given step
+  to engage in fraudulent activity
 
-- TKTKT nodes
-- TKTKT relationships
-
-Which will translate to approximately:
-
-The default settings from Neo4j will suffice, but you may want to bump
-things up a small amount by editing the =neo4j.conf= file to change
-some heap and pagecache settings:
+Changing the population size will have a dramatic effect on the size
+of the resulting database, so for now as you get started I recommend
+the keeping the default settings, but change the seed:
 
 #+BEGIN_SRC properties
-dbms.memory.heap.initial_size=1G
-dbms.memory.heap.max_size=1G
-dbms.memory.pagecache.size=1.5G
+  seed=12345
+  nbSteps=720
+  multiplier=1
+  nbClients=2000
+  nbFraudsters=100
+  nbMerchants=347
+  nbBanks=5
+  fraudProbability=0.004
+#+END_SRC
+
+** Stage our Database
+If you use the above simulation parameters, you'll be producing a
+graph with approximately:
+
+- *3.5 million* nodes
+- *10 million* relationships
+
+Which will translate to approximately a 1.5GB database (store +
+indexes) not counting transaction logs.
+
+The default settings from Neo4j will suffice at first, but you may
+want to bump things up a small amount by editing the =neo4j.conf= file
+to change some heap and pagecache settings:
+
+#+BEGIN_SRC properties
+  dbms.memory.heap.initial_size=1G
+  dbms.memory.heap.max_size=1G
+  dbms.memory.pagecache.size=1.5G
+#+END_SRC
+
+** Install the APOC Library
+If you're using Neo4j Desktop, this step is easy. Click on "Add
+Plugin" in your PaySim project and then the "Install" button under the
+APOC library option.
+
+#+CAPTION: Installing APOC via Neo4j Desktop
+#+NAME: fig:installing-apoc
+[[file:../static/img/installing-apoc.png]]
+
+If you're not using Neo4j Desktop, grab a released APOC jar from the
+project on GitHub:
+https://github.com/neo4j-contrib/neo4j-apoc-procedures
+
+#+BEGIN_QUOTE
+If installing APOC manually, make sure to download a version that
+matches your Neo4j version (e.g. APOC 3.5.0.7 for Neo4j v3.5).
+#+END_QUOTE
+
+Make sure to restart the database after installing the plugin.
+
+You can confirm APOC is installed and available by running the
+following Cypher:
+
+#+BEGIN_SRC cypher
+  CALL apoc.help('apoc')
 #+END_SRC
 
 ** Run the Simulation
+This is the easiest part. Assuming you've followed the above
+[[Building the Demo Project][instructions]] to build the project, you just need to run the
+appropriate =bin/paysim-demo= or =bin\paysim-demo.bat= script.
+
+You can, and should, pass in any of the following command line
+arguments to match your Neo4j environment:
+
+#+NAME: command line arguments
+#+CAPTION: paysim-demo command line arguments
+| Argument       | Description                            | Default                 |
+|----------------+----------------------------------------+-------------------------|
+| =--properties= | Path to the PaySim.properties file     | PaySim.properties       |
+| =--uri=        | Bolt URI to your target Neo4j database | =bolt://localhost:7687= |
+| =--username=   | Neo4j account to connect with          | =neo4j=                 |
+| =--password=   | Password for the account               | =password=              |
+| =--tls=        | Use TLS encryption on Bolt connection? | =false=                 |
+| =--batchSize=  | Transaction batch size                 | 500                     |
+| =--queueDepth= | PaySim worker thread queue depth       | 5000                    |
+|----------------+----------------------------------------+-------------------------|
+
+On a relatively modern system[fn:8], running with my recommended parameters
+should take about /8-10 minutes/. You'll see output similar to the
+following:
+
+#+BEGIN_SRC
+[main] INFO Driver - Direct driver instance 1525919705 created for server address localhost:7687
+[main] INFO io.sisu.paysim.App - Simulation started, load commencing...please, be patient! :-)
+[SimulationWorker] INFO org.paysim.PaySimState - Init - Seed 12345
+[SimulationWorker] INFO org.paysim.PaySimState - NbBanks: 5
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by com.google.inject.internal.cglib.core.$ReflectUtils$1 (file:/Users/dave/src/neo4j/paysim-demo/build/distributions/pays
+im-demo-0.2.0/lib/paysim-2.1.0.jar) to method java.lang.ClassLoader.defineClass(java.lang.String,byte[],int,int,java.security.ProtectionDomain)
+WARNING: Please consider reporting this to the maintainers of com.google.inject.internal.cglib.core.$ReflectUtils$1
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+[SimulationWorker] INFO org.paysim.PaySimState - NbMerchants: 3474
+[SimulationWorker] INFO org.paysim.PaySimState - NbFraudsters: 1000
+[SimulationWorker] INFO org.paysim.PaySimState - NbClients: 20000
+[main] INFO io.sisu.paysim.App - [loaded 3406242 PaySim transactions]
+[main] INFO io.sisu.paysim.App - [estimated load rate: 8307.91 PaySim-transactions/second]
+[main] INFO io.sisu.paysim.App - Labeling all Mules as Clients...
+[main] INFO io.sisu.paysim.App - Creating 'identity' materials associated with Client accounts...
+[main] WARN RetryLogic - Transaction failed and will be retried in 817ms
+[main] INFO io.sisu.paysim.App - Setting any extra node properties for Merchants and Banks...
+[main] INFO io.sisu.paysim.App - Threading transactions...
+[main] INFO Driver - Closing driver instance 1525919705
+[main] INFO ConnectionPool - Closing connection pool towards localhost:7687
+[main] INFO io.sisu.paysim.App - Simulation & Load COMPLETED in 8m 44s
+#+END_SRC
+
+#+BEGIN_QUOTE
+You'll notice you may get a =Transaction failed and will be
+retried...= warning. Don't worry: this is a minor bug in my
+implementation but thanks to the transaction functions auto-retry
+feature you can ignore this.
+#+END_QUOTE
 
 ** Confirm our Graph is Loaded
+Using either Neo4j Browser or cypher-shell, connect to your Neo4j
+instance. You should see a plethora of data!
 
+#+CAPTION: Preview of our PaySim data
+#+NAME: fig:paysim-data-preview
+[[file:../static/img/paysim-data-preview.png]]
+
+Make sure you see the appropriate labels and relationships available.
 
 * Wrapping Up
+At this point you can play around with exploring the graph through
+Cypher and Neo4j Browser. Maybe create a few different databases using
+different parameters to see how things change.
 
 * Next Time: Analyzing our Graph
 We've now covered some [[file:paysim.org][background on PaySim]] and, in this post, covered
@@ -576,3 +695,7 @@ errors automatically and use retries without any additional code.
 [fn:6] https://guava.dev/releases/snapshot/api/docs/com/google/common/collect/Lists.html#partition-java.util.List-int-
 
 [fn:7] https://github.com/voutilad/paysim-demo/blob/a72a8e6172b0d58ae9c340c65386f96adc0acc95/src/main/java/io/sisu/paysim/App.java
+
+[fn:8] I'm running this on an Intel i7-4790K CPU @ 4.00GHz, so not the
+newest of CPUs, but still pretty speedy. This is in a Late 2014 iMac
+with 32GB of RAM and an SSD.

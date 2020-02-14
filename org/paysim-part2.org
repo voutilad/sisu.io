@@ -1,4 +1,4 @@
-#+TITLE: Integrating PaySim with Neo4j 🔌 (PaySim pt.2)
+#+TITLE: [WIP] Integrating PaySim with Neo4j 🔌 (PaySim pt.2)
 #+DESCRIPTION: In which we look at how to leverage PaySim to build a fraud graph
 #+DATE: 2020-02-14
 #+OPTIONS: toc:2
@@ -6,6 +6,10 @@
 #+hugo_tags: neo4j fraud java paysim
 #+hugo_base_dir: ..
 #+hugo_section: posts
+
+#+BEGIN_QUOTE
+⚠ THIS IS A DRAFT RELEASE. ONE OR TWO SECTIONS MAY NOT BE COMPLETED ⚠
+#+END_QUOTE
 
 [[./paysim.org][Previously]], we looked at how PaySim models mobile money networks to
 simulate hidden fraudulent behavior and how my fork[fn:1] makes it
@@ -383,10 +387,9 @@ This comes from a Google's [[https://github.com/google/guava][Guava library]] an
 given size. Our code then works on taking batches of our PaySim
 Clients and using transaction functions to bulk load the changes.
 
-** Step 5. Updating Additional Node Properties
+** TODO Step 5. Updating Additional Node Properties
 
-
-** Step 6. Thread Transactions into Chains
+** TODO Step 6. Thread Transactions into Chains
 
 * Putting it All Together
 Here's a glimpse at the finished product, specifically a look at the

@@ -1,9 +1,9 @@
 +++
-title = "Integrating PaySim with Neo4j 🔌 (PaySim pt.2)"
+title = "[WIP] Integrating PaySim with Neo4j 🔌 (PaySim pt.2)"
 author = ["Dave Voutila"]
 description = "In which we look at how to leverage PaySim to build a fraud graph"
 date = 2020-02-14
-lastmod = 2020-02-14T16:19:14-05:00
+lastmod = 2020-02-14T16:24:35-05:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -20,8 +20,8 @@ draft = false
     - [Step 2: Iteratively Loading PaySim Transactions](#step-2-iteratively-loading-paysim-transactions)
     - [Step 3. Disguising our Mules](#step-3-dot-disguising-our-mules)
     - [Step 4. Establishing Identities and their Relationships](#step-4-dot-establishing-identities-and-their-relationships)
-    - [Step 5. Updating Additional Node Properties](#step-5-dot-updating-additional-node-properties)
-    - [Step 6. Thread Transactions into Chains](#step-6-dot-thread-transactions-into-chains)
+    - [<span class="org-todo todo TODO">TODO</span> Step 5. Updating Additional Node Properties](#step-5-dot-updating-additional-node-properties)
+    - [<span class="org-todo todo TODO">TODO</span> Step 6. Thread Transactions into Chains](#step-6-dot-thread-transactions-into-chains)
 - [Putting it All Together](#putting-it-all-together)
 - [Let's Run It! 🏃](#let-s-run-it)
     - [Building the Demo Project](#building-the-demo-project)
@@ -35,6 +35,8 @@ draft = false
 
 </div>
 <!--endtoc-->
+
+> ⚠ THIS IS A DRAFT RELEASE. ONE OR TWO SECTIONS MAY NOT BE COMPLETED ⚠
 
 [Previously]({{< relref "paysim" >}}), we looked at how PaySim models mobile money networks to
 simulate hidden fraudulent behavior and how my fork[^fn:1] makes it
@@ -85,7 +87,7 @@ test our fruad detection approaches:
 Everything except the chaining was visible in our [previous data
 model]({{< relref "paysim" >}}), so here's how it should look when we're done:
 
-<a id="org86411a8"></a>
+<a id="org3288361"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 1: Our target PaySim 2.1 data model" >}}
 
@@ -422,10 +424,10 @@ given size. Our code then works on taking batches of our PaySim
 Clients and using transaction functions to bulk load the changes.
 
 
-### Step 5. Updating Additional Node Properties {#step-5-dot-updating-additional-node-properties}
+### <span class="org-todo todo TODO">TODO</span> Step 5. Updating Additional Node Properties {#step-5-dot-updating-additional-node-properties}
 
 
-### Step 6. Thread Transactions into Chains {#step-6-dot-thread-transactions-into-chains}
+### <span class="org-todo todo TODO">TODO</span> Step 6. Thread Transactions into Chains {#step-6-dot-thread-transactions-into-chains}
 
 
 ## Putting it All Together {#putting-it-all-together}
@@ -618,7 +620,7 @@ If you're using Neo4j Desktop, this step is easy. Click on "Add
 Plugin" in your PaySim project and then the "Install" button under the
 APOC library option.
 
-<a id="org9911558"></a>
+<a id="org26e326b"></a>
 
 {{< figure src="/img/installing-apoc.png" caption="Figure 2: Installing APOC via Neo4j Desktop" >}}
 
@@ -705,7 +707,7 @@ WARNING: All illegal access operations will be denied in a future release
 Using either Neo4j Browser or cypher-shell, connect to your Neo4j
 instance. You should see a plethora of data!
 
-<a id="org7643d54"></a>
+<a id="orgb483ecb"></a>
 
 {{< figure src="/img/paysim-data-preview.png" caption="Figure 3: Preview of our PaySim data" >}}
 
@@ -724,7 +726,7 @@ different parameters to see how things change.
 We've now covered some [background on PaySim]({{< relref "paysim" >}}) and, in this post, covered
 how to take PaySim and populate a Neo4j graph database.
 
-<a id="org8749aaf"></a>
+<a id="org63ca393"></a>
 
 {{< figure src="/img/paysim-bloom-preview.jpg" caption="Figure 4: A preview of what's to come" >}}
 

@@ -8,7 +8,7 @@ enableGitInfo = true
   [markup.highlight]
     codeFences = true
     lineNos = false
-    style = "emacs"
+    style = "borland"
 
 [taxonomies]
   tag = "tags"

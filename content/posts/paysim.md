@@ -3,7 +3,7 @@ title = "Simulating Mobile Money Fraud 🤑 (PaySim pt.1)"
 author = ["Dave Voutila"]
 description = "Creating a realistic data-set for analysis using PaySim"
 date = 2020-02-13
-lastmod = 2020-02-13T08:45:57-05:00
+lastmod = 2020-02-14T16:19:20-05:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -49,7 +49,7 @@ exploring ways to detect fraudulent behavior.
 > Check out their initial dataset posted to kaggle:
 > <https://www.kaggle.com/ntnu-testimon/paysim1>
 
-<a id="orgc079ff6"></a>
+<a id="org1f1dedc"></a>
 
 {{< figure src="/img/kaggle-arjunjoshua-paysim-fingerprints.png" caption="Figure 1: \"...fingerprints of [PaySim] transactions over time\" by Arjun Joshua" >}}
 
@@ -111,7 +111,7 @@ Let's jump a bit ahead and talk about what PaySim produces with the
 help of a graph visualization and then dive into the core components
 of the simulation: _Agents and Transactions._
 
-<a id="org21104ec"></a>
+<a id="org756487f"></a>
 
 {{< figure src="/img/simplified-data-model.png" caption="Figure 2: Graphical representation of the PaySim data model" >}}
 
@@ -322,7 +322,7 @@ analagous to the original PaySim project, you can run the `main()`
 method in the `OriginalPaySim` class and it will write out all the
 expected output files to disk.
 
-<a id="org5cf0799"></a>
+<a id="orgabab38d"></a>
 
 {{< figure src="/img/IteratingPaySim.svg" caption="Figure 3: IteratingPaySim Implementation (high-level)" >}}
 
@@ -480,7 +480,7 @@ What should it look like in the end? From a graph perspective, there's
 a pretty trivial way to incorporate identities with Clients: relate
 each Client to an instance of an Identity.
 
-<a id="org1df446f"></a>
+<a id="orga40451c"></a>
 
 {{< figure src="/img/simple-identity-model.png" caption="Figure 4: Pretty simple model: Client's have one or many identifiers" >}}
 
@@ -580,11 +580,11 @@ run standalone or embedded. We've also got an understanding of our
 data model and how we plan on adapting it to our graph model, laying
 the foundation. Our data model is also slightly different.
 
-<a id="org82146c5"></a>
+<a id="org4dd7978"></a>
 
 {{< figure src="/img/paysim-2.1.0-part1.png" caption="Figure 5: Our Updated PaySim 2.1 Data Model" >}}
 
-You'll notice that unlike [what we started with](#org21104ec), it now provides
+You'll notice that unlike [what we started with](#org756487f), it now provides
 identifiers (e.g. `Phone`, `Email`, `SSN`) for each Client account
 (which may or may not be a Mule).
 
@@ -602,7 +602,7 @@ simulate some fraud!
 
 ## Next Episode: Getting PaySim Transactions into Neo4j {#next-episode-getting-paysim-transactions-into-neo4j}
 
-In my next post, we'll look at how to configure and run a PaySim
+In my [next post]({{< relref "paysim-part2" >}}), we'll look at how to configure and run a PaySim
 simulation while simultaneously bulk loading the transaction output
 into a live Neo4j instance. We'll cover:
 

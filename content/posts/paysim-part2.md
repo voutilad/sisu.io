@@ -3,7 +3,7 @@ title = "Integrating PaySim with Neo4j 🔌 (PaySim pt.2)"
 author = ["Dave Voutila"]
 description = "In which we look at how to leverage PaySim to build a fraud graph"
 date = 2020-02-16
-lastmod = 2020-02-16T08:35:30-05:00
+lastmod = 2020-02-16T08:35:45-05:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -85,7 +85,7 @@ test our fruad detection approaches:
 Everything except the chaining was visible in our [previous data
 model]({{< relref "paysim" >}}), so here's how it should look when we're done:
 
-<a id="orga21f7a6"></a>
+<a id="org09cf180"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 1: Our target PaySim 2.1 data model" >}}
 
@@ -720,7 +720,7 @@ If you're using Neo4j Desktop, this step is easy. Click on "Add
 Plugin" in your PaySim project and then the "Install" button under the
 APOC library option.
 
-<a id="org0a3e118"></a>
+<a id="org996448b"></a>
 
 {{< figure src="/img/installing-apoc.png" caption="Figure 2: Installing APOC via Neo4j Desktop" >}}
 
@@ -807,7 +807,7 @@ WARNING: All illegal access operations will be denied in a future release
 Using either Neo4j Browser or cypher-shell, connect to your Neo4j
 instance. You should see a plethora of data!
 
-<a id="org7bcc9cb"></a>
+<a id="org83d0245"></a>
 
 {{< figure src="/img/paysim-data-preview.png" caption="Figure 3: Preview of our PaySim data" >}}
 
@@ -826,7 +826,7 @@ different parameters to see how things change.
 We've now covered some [background on PaySim]({{< relref "paysim" >}}) and, in this post, covered
 how to take PaySim and populate a Neo4j graph database.
 
-<a id="org45cabac"></a>
+<a id="org3a2868e"></a>
 
 {{< figure src="/img/paysim-bloom-preview.jpg" caption="Figure 4: A preview of what's to come" >}}
 

@@ -7,10 +7,6 @@
 #+hugo_base_dir: ..
 #+hugo_section: posts
 
-#+BEGIN_QUOTE
-⚠ THIS IS A DRAFT RELEASE. ONE OR TWO SECTIONS MAY NOT BE COMPLETED ⚠
-#+END_QUOTE
-
 [[./paysim.org][Previously]], we looked at how PaySim models mobile money networks to
 simulate hidden fraudulent behavior and how my fork[fn:1] makes it
 possible to build off the original authors' work and model more

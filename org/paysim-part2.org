@@ -1,6 +1,6 @@
-#+TITLE: [WIP] Integrating PaySim with Neo4j 🔌 (PaySim pt.2)
+#+TITLE: Integrating PaySim with Neo4j 🔌 (PaySim pt.2)
 #+DESCRIPTION: In which we look at how to leverage PaySim to build a fraud graph
-#+DATE: 2020-02-14
+#+DATE: 2020-02-16
 #+OPTIONS: toc:2
 #+hugo_auto_set_lastmod: t
 #+hugo_tags: neo4j fraud java paysim
@@ -196,6 +196,7 @@ let's just make it a 2 step process:
 
 Let's take a look at a condensed solution:
 
+#+NAME: transaction-code
 #+BEGIN_SRC java
   import org.neo4j.driver.Query;
   import org.paysim.base.Transaction;
@@ -387,13 +388,114 @@ This comes from a Google's [[https://github.com/google/guava][Guava library]] an
 given size. Our code then works on taking batches of our PaySim
 Clients and using transaction functions to bulk load the changes.
 
-** TODO Step 5. Updating Additional Node Properties
+** Step 5. Updating Additional Node Properties
+PaySim provides some metadata that would be useful as properties on
+some of our nodes. For transactions, most of these details are loaded
+in our [[transaction-code][previous cypher]] like /amount/ and the /globalStep/[fn:7]. But
+previously we were using =Transaction= instances to data-drive our
+query and they don't contain all the possible metadata related to the
+agents involved.
 
-** TODO Step 6. Thread Transactions into Chains
+Since PaySim tracks all the actors in the simulation, we can simply
+ask for references to each of them and bulk load any extraneous
+properties we may want to apply to the nodes in the graph,
+specifically a descriptive /name/ property.
+
+#+BEGIN_QUOTE
+This approach may look like overkill and, given that it now uses the
+=Identity= interface from [[file:paysim.org::Modeling Identities][Modeling Identities]] it is a bit vestigial,
+however as we may add additional metadata to PaySim actors in the
+future, this serves as a generic way to easily capture them in the
+graph.
+#+END_QUOTE
+
+We'll use another utility method from Google Guava, specifically the
+=Streams.concat(Stream<? extends T> ...streams)=[fn:8] method. It
+lets us form Java 8-style streams from our lists of Merchants and
+Banks so we can operate on them all at once (since they both derive
+from the same base class).
+
+In this particular case, we're mostly using it as a shortcut, since we
+immediately collect the results into a =List<SuperActor>=. Merchants
+and Banks make up a fractional amount of the simulation population, so
+it's not really a memory burden.
+
+#+BEGIN_SRC java
+  // Concatenate our streams of actors. For now we collect them ahead of time.
+  List<SuperActor> allActors = Streams.concat(
+          sim.getMerchants().stream(),
+          sim.getBanks().stream()).collect(Collectors.toList());
+
+  // Using our blended List<SuperActor>, process in bulk.
+  Lists.partition(allActors, config.batchSize).forEach(chunk -> {
+            List<Query> queries = chunk.stream()
+                  .map(actor -> Util.compilePropertyUpdateQuery(actor))
+                  .collect(Collectors.toList());
+            Database.executeBatch(driver, queries);
+  });
+#+END_SRC
+
+In this case, we'll use a very simple Cypher query that treats nodes
+as property maps. Like when we loaded transactions, we're doing the
+2-pass approach of templatizing the label and parameterizing the
+property values in the Cypher.
+
+#+BEGIN_SRC java
+  static final String UPDATE_NODE_PROPS = "MATCH (n:" + LABEL_PLACEHOLDER + " {id: $id}) SET n += $props";
+#+END_SRC
+
+The use of the =+==[fn:9] operator makes sure we only mutate
+properties in the given map, so we don't replace things like the
+unique =id= property that we have managed by a uniqueness constraint.
+
+** Step 6. Thread Transactions into Chains
+Our final step is threading each Client's transactions into ordered
+chains. We'll finally use the =UNWIND= approach [[Batch Executing Cypher in Code][previously mentioned]]
+but with a twist: We're now going to rely on a very hand APOC function
+to help out in constructing relationships.
+
+At a high level, for each Client we want to get /all/ their
+transactions, order them into the sequence they occurred at, and then
+related each transaction to the =:NEXT= one in the sequence. Here's
+how it looks:
+
+#+BEGIN_SRC cypher
+// Where $ids is a list of the client ids we want to process
+UNWIND $ids AS clientId
+  MATCH (c:Client {id: clientId})-[:PERFORMED]->(tx:Transaction)
+  WITH c, tx ORDER BY tx.globalStep
+  WITH c, collect(tx) AS txs
+  WITH c, txs, head(txs) AS _start, last(txs) AS _last
+
+  MERGE (c)-[:FIRST_TX]->(_start)
+  MERGE (c)-[:LAST_TX]->(_last)
+  WITH c, apoc.coll.pairsMin(txs) AS pairs
+
+  UNWIND pairs AS pair
+    WITH pair[0] AS a, pair[1] AS b
+    MERGE (a)-[n:NEXT]->(b)
+    RETURN COUNT(n)
+#+END_SRC
+
+The =apoc.coll.pairsMin()= function[fn:12] takes a list of items and
+generates overlapping tuples. For example:
+
+#+BEGIN_SRC cypher
+RETURN apoc.coll.pairsMin([1, 2, 3, 4, 5])
+#+END_SRC
+
+Produces:
+
+#+BEGIN_SRC javascript
+[[1, 2], [2, 3], [3, 4], [4, 5]]
+#+END_SRC
+
+We simply =UNWIND= this list of tuples and construct the =:NEXT=
+relationships between each member. /Et voilà!/
 
 * Putting it All Together
 Here's a glimpse at the finished product, specifically a look at the
-core loading logic from the =App.run()= method.[fn:7]
+core loading logic from the =App.run()= method.[fn:10]
 
 #+BEGIN_SRC java
   public static void run(Config config) {
@@ -613,7 +715,7 @@ arguments to match your Neo4j environment:
 | =--queueDepth= | PaySim worker thread queue depth       | 5000                    |
 |----------------+----------------------------------------+-------------------------|
 
-On a relatively modern system[fn:8], running with my recommended parameters
+On a relatively modern system[fn:11], running with my recommended parameters
 should take about /8-10 minutes/. You'll see output similar to the
 following:
 
@@ -697,8 +799,22 @@ errors automatically and use retries without any additional code.
 
 [fn:6] https://guava.dev/releases/snapshot/api/docs/com/google/common/collect/Lists.html#partition-java.util.List-int-
 
-[fn:7] https://github.com/voutilad/paysim-demo/blob/a72a8e6172b0d58ae9c340c65386f96adc0acc95/src/main/java/io/sisu/paysim/App.java
+[fn:7] /globalStep/ is an artifact of the =IteratingPaySim=
+implementation and effectively is the sequence number for which order
+a transaction occurred. It can be used to identify if any one
+transaction happened before another, but /step/ must be used to get a
+baseline approximation of the /time/ a transaction occurred.
 
-[fn:8] I'm running this on an Intel i7-4790K CPU @ 4.00GHz, so not the
+[fn:8] [[https://guava.dev/releases/23.0/api/docs/com/google/common/collect/Streams.html#concat-java.util.stream.Stream...-]]
+
+[fn:9] https://neo4j.com/docs/cypher-manual/4.0/clauses/set/#set-setting-properties-using-map
+
+[fn:12] See
+https://neo4j.com/docs/labs/apoc/current/data-structures/collection-list-functions/
+for more details on this and other APOC list/collection functions.
+
+[fn:10] https://github.com/voutilad/paysim-demo/blob/a72a8e6172b0d58ae9c340c65386f96adc0acc95/src/main/java/io/sisu/paysim/App.java
+
+[fn:11] I'm running this on an Intel i7-4790K CPU @ 4.00GHz, so not the
 newest of CPUs, but still pretty speedy. This is in a Late 2014 iMac
 with 32GB of RAM and an SSD.

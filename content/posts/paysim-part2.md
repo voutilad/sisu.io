@@ -1,9 +1,9 @@
 +++
-title = "[WIP] Integrating PaySim with Neo4j 🔌 (PaySim pt.2)"
+title = "Integrating PaySim with Neo4j 🔌 (PaySim pt.2)"
 author = ["Dave Voutila"]
 description = "In which we look at how to leverage PaySim to build a fraud graph"
-date = 2020-02-14
-lastmod = 2020-02-14T16:24:35-05:00
+date = 2020-02-16
+lastmod = 2020-02-16T08:33:35-05:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -20,8 +20,8 @@ draft = false
     - [Step 2: Iteratively Loading PaySim Transactions](#step-2-iteratively-loading-paysim-transactions)
     - [Step 3. Disguising our Mules](#step-3-dot-disguising-our-mules)
     - [Step 4. Establishing Identities and their Relationships](#step-4-dot-establishing-identities-and-their-relationships)
-    - [<span class="org-todo todo TODO">TODO</span> Step 5. Updating Additional Node Properties](#step-5-dot-updating-additional-node-properties)
-    - [<span class="org-todo todo TODO">TODO</span> Step 6. Thread Transactions into Chains](#step-6-dot-thread-transactions-into-chains)
+    - [Step 5. Updating Additional Node Properties](#step-5-dot-updating-additional-node-properties)
+    - [Step 6. Thread Transactions into Chains](#step-6-dot-thread-transactions-into-chains)
 - [Putting it All Together](#putting-it-all-together)
 - [Let's Run It! 🏃](#let-s-run-it)
     - [Building the Demo Project](#building-the-demo-project)
@@ -87,7 +87,7 @@ test our fruad detection approaches:
 Everything except the chaining was visible in our [previous data
 model]({{< relref "paysim" >}}), so here's how it should look when we're done:
 
-<a id="org3288361"></a>
+<a id="org03ed624"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 1: Our target PaySim 2.1 data model" >}}
 
@@ -228,6 +228,7 @@ let's just make it a 2 step process:
 
 Let's take a look at a condensed solution:
 
+<a id="code-snippet--transaction-code"></a>
 ```java
 import org.neo4j.driver.Query;
 import org.paysim.base.Transaction;
@@ -424,16 +425,117 @@ given size. Our code then works on taking batches of our PaySim
 Clients and using transaction functions to bulk load the changes.
 
 
-### <span class="org-todo todo TODO">TODO</span> Step 5. Updating Additional Node Properties {#step-5-dot-updating-additional-node-properties}
+### Step 5. Updating Additional Node Properties {#step-5-dot-updating-additional-node-properties}
+
+PaySim provides some metadata that would be useful as properties on
+some of our nodes. For transactions, most of these details are loaded
+in our [previous cypher](#code-snippet--transaction-code) like _amount_ and the _globalStep_[^fn:7]. But
+previously we were using `Transaction` instances to data-drive our
+query and they don't contain all the possible metadata related to the
+agents involved.
+
+Since PaySim tracks all the actors in the simulation, we can simply
+ask for references to each of them and bulk load any extraneous
+properties we may want to apply to the nodes in the graph,
+specifically a descriptive _name_ property.
+
+> This approach may look like overkill and, given that it now uses the
+> `Identity` interface from [Modeling Identities]({{< relref "paysim" >}}) it is a bit vestigial,
+> however as we may add additional metadata to PaySim actors in the
+> future, this serves as a generic way to easily capture them in the
+> graph.
+
+We'll use another utility method from Google Guava, specifically the
+`Streams.concat(Stream<? extends T> ...streams)`[^fn:8] method. It
+lets us form Java 8-style streams from our lists of Merchants and
+Banks so we can operate on them all at once (since they both derive
+from the same base class).
+
+In this particular case, we're mostly using it as a shortcut, since we
+immediately collect the results into a `List<SuperActor>`. Merchants
+and Banks make up a fractional amount of the simulation population, so
+it's not really a memory burden.
+
+```java
+// Concatenate our streams of actors. For now we collect them ahead of time.
+List<SuperActor> allActors = Streams.concat(
+        sim.getMerchants().stream(),
+        sim.getBanks().stream()).collect(Collectors.toList());
+
+// Using our blended List<SuperActor>, process in bulk.
+Lists.partition(allActors, config.batchSize).forEach(chunk -> {
+          List<Query> queries = chunk.stream()
+                .map(actor -> Util.compilePropertyUpdateQuery(actor))
+                .collect(Collectors.toList());
+          Database.executeBatch(driver, queries);
+});
+```
+
+In this case, we'll use a very simple Cypher query that treats nodes
+as property maps. Like when we loaded transactions, we're doing the
+2-pass approach of templatizing the label and parameterizing the
+property values in the Cypher.
+
+```java
+static final String UPDATE_NODE_PROPS = "MATCH (n:" + LABEL_PLACEHOLDER + " {id: $id}) SET n += $props";
+```
+
+The use of the `+=`[^fn:9] operator makes sure we only mutate
+properties in the given map, so we don't replace things like the
+unique `id` property that we have managed by a uniqueness constraint.
 
 
-### <span class="org-todo todo TODO">TODO</span> Step 6. Thread Transactions into Chains {#step-6-dot-thread-transactions-into-chains}
+### Step 6. Thread Transactions into Chains {#step-6-dot-thread-transactions-into-chains}
+
+Our final step is threading each Client's transactions into ordered
+chains. We'll finally use the `UNWIND` approach [previously mentioned](#batch-executing-cypher-in-code)
+but with a twist: We're now going to rely on a very hand APOC function
+to help out in constructing relationships.
+
+At a high level, for each Client we want to get _all_ their
+transactions, order them into the sequence they occurred at, and then
+related each transaction to the `:NEXT` one in the sequence. Here's
+how it looks:
+
+```cypher
+// Where $ids is a list of the client ids we want to process
+UNWIND $ids AS clientId
+  MATCH (c:Client {id: clientId})-[:PERFORMED]->(tx:Transaction)
+  WITH c, tx ORDER BY tx.globalStep
+  WITH c, collect(tx) AS txs
+  WITH c, txs, head(txs) AS _start, last(txs) AS _last
+
+  MERGE (c)-[:FIRST_TX]->(_start)
+  MERGE (c)-[:LAST_TX]->(_last)
+  WITH c, apoc.coll.pairsMin(txs) AS pairs
+
+  UNWIND pairs AS pair
+    WITH pair[0] AS a, pair[1] AS b
+    MERGE (a)-[n:NEXT]->(b)
+    RETURN COUNT(n)
+```
+
+The `apoc.coll.pairsMin()` function[^fn:10] takes a list of items and
+generates overlapping tuples. For example:
+
+```cypher
+RETURN apoc.coll.pairsMin([1, 2, 3, 4, 5])
+```
+
+Produces:
+
+```javascript
+[[1, 2], [2, 3], [3, 4], [4, 5]]
+```
+
+We simply `UNWIND` this list of tuples and construct the `:NEXT`
+relationships between each member. _Et voilà!_
 
 
 ## Putting it All Together {#putting-it-all-together}
 
 Here's a glimpse at the finished product, specifically a look at the
-core loading logic from the `App.run()` method.[^fn:7]
+core loading logic from the `App.run()` method.[^fn:11]
 
 ```java
 public static void run(Config config) {
@@ -620,7 +722,7 @@ If you're using Neo4j Desktop, this step is easy. Click on "Add
 Plugin" in your PaySim project and then the "Install" button under the
 APOC library option.
 
-<a id="org26e326b"></a>
+<a id="org5dc8046"></a>
 
 {{< figure src="/img/installing-apoc.png" caption="Figure 2: Installing APOC via Neo4j Desktop" >}}
 
@@ -666,7 +768,7 @@ arguments to match your Neo4j environment:
 | `--batchSize`  | Transaction batch size                 | 500                     |
 | `--queueDepth` | PaySim worker thread queue depth       | 5000                    |
 
-On a relatively modern system[^fn:8], running with my recommended parameters
+On a relatively modern system[^fn:12], running with my recommended parameters
 should take about _8-10 minutes_. You'll see output similar to the
 following:
 
@@ -707,7 +809,7 @@ WARNING: All illegal access operations will be denied in a future release
 Using either Neo4j Browser or cypher-shell, connect to your Neo4j
 instance. You should see a plethora of data!
 
-<a id="orgb483ecb"></a>
+<a id="org2016dd8"></a>
 
 {{< figure src="/img/paysim-data-preview.png" caption="Figure 3: Preview of our PaySim data" >}}
 
@@ -726,7 +828,7 @@ different parameters to see how things change.
 We've now covered some [background on PaySim]({{< relref "paysim" >}}) and, in this post, covered
 how to take PaySim and populate a Neo4j graph database.
 
-<a id="org63ca393"></a>
+<a id="orgc2205eb"></a>
 
 {{< figure src="/img/paysim-bloom-preview.jpg" caption="Figure 4: A preview of what's to come" >}}
 
@@ -741,5 +843,9 @@ _Tot ziens!_
 [^fn:4]: <https://neo4j.com/docs/cypher-manual/3.5/clauses/unwind/>
 [^fn:5]: See <https://neo4j.com/docs/driver-manual/1.7/sessions-transactions/#driver-transactions-transaction-functions> for more details. Transaction functions are supported across many driver languages including: C#, Go, Java, JavaScript, and Python. A major nicety of transaction functions is they can handle transient errors automatically and use retries without any additional code.
 [^fn:6]: <https://guava.dev/releases/snapshot/api/docs/com/google/common/collect/Lists.html#partition-java.util.List-int>-
-[^fn:7]: <https://github.com/voutilad/paysim-demo/blob/a72a8e6172b0d58ae9c340c65386f96adc0acc95/src/main/java/io/sisu/paysim/App.java>
-[^fn:8]: I'm running this on an Intel i7-4790K CPU @ 4.00GHz, so not the newest of CPUs, but still pretty speedy. This is in a Late 2014 iMac with 32GB of RAM and an SSD.
+[^fn:7]: _globalStep_ is an artifact of the `IteratingPaySim` implementation and effectively is the sequence number for which order a transaction occurred. It can be used to identify if any one transaction happened before another, but _step_ must be used to get a baseline approximation of the _time_ a transaction occurred.
+[^fn:8]: <https://guava.dev/releases/23.0/api/docs/com/google/common/collect/Streams.html#concat-java.util.stream.Stream...->
+[^fn:9]: <https://neo4j.com/docs/cypher-manual/4.0/clauses/set/#set-setting-properties-using-map>
+[^fn:10]: See <https://neo4j.com/docs/labs/apoc/current/data-structures/collection-list-functions/> for more details on this and other APOC list/collection functions.
+[^fn:11]: <https://github.com/voutilad/paysim-demo/blob/a72a8e6172b0d58ae9c340c65386f96adc0acc95/src/main/java/io/sisu/paysim/App.java>
+[^fn:12]: I'm running this on an Intel i7-4790K CPU @ 4.00GHz, so not the newest of CPUs, but still pretty speedy. This is in a Late 2014 iMac with 32GB of RAM and an SSD.

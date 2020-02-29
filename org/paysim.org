@@ -16,7 +16,7 @@ data. If it's not obvious, /a lack of publicly available datasets is a
 real problem for academics/ looking to develop machine learning or
 heuristic approaches to fraud detection.
 
-/Lopez-Rojas, Elmire, and Axelsson/[fn:1] published a *PaySim*, an
+/Lopez-Rojas, Elmire, and Axelsson/[fn:1] published *PaySim*, an
 approach using an agent-based model and some anonymized, aggregate
 transactional data from a real mobile money network operator to create
 synthetic financial data sets academics and hackers can use for

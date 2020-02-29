@@ -1,0 +1,413 @@
+#+TITLE: Analyzing 1st Party Fraud with Neo4j 🔌 (PaySim pt.3)
+#+DESCRIPTION: How well does our PaySim enhancements model 1st party fraud and how can we detect it?
+#+DATE: 2020-02-28
+#+OPTIONS: toc:2
+#+hugo_auto_set_lastmod: t
+#+hugo_tags: neo4j fraud java paysim
+#+hugo_base_dir: ..
+#+hugo_section: posts
+
+#+BEGIN_QUOTE
+Looking for prevoius posts? See [[file:paysim.org][part 1]] to learn about PaySim and
+[[file:paysim-part2.org][part 2]] to learn about integrating it with Neo4j.
+#+END_QUOTE
+
+#+CAPTION: A Preview of What's to Come
+#+FIG: paysim-part3-preview
+[[file:../static/img/paysim-part3-preview.svg]]
+
+We've now got a graph representing 30 days of financial transactions
+in our simulated network. Somewhere in the haystack are our [[file:paysim.org::Enhancing PaySim's Fraudsters][fraudsters]]
+or at least the result of their malicious behavior. How can we exploit
+the shape of the graph to surface the fraud?
+
+* What's our Graph look like again?
+Before we dig into our methodology and look at some queries, let's
+first recap and look at the graph we built in [[file:paysim-part2.org][part 2]]. We can use a mix
+of Cypher and helper procedures from [[https://neo4j.com/docs/labs/apoc/][APOC]] to profile our graph.
+
+#+BEGIN_SRC cypher
+CALL db.labels() YIELD label
+CALL apoc.cypher.run('MATCH (:`'+label+'`) RETURN count(*) as freq',{}) YIELD value
+WITH label,value.freq AS freq
+CALL apoc.meta.stats() YIELD nodeCount
+WITH *, 3 AS presicion
+WITH *, 10^presicion AS factor, toFloat(freq)/toFloat(nodeCount) AS relFreq
+RETURN label AS nodeLabel, freq AS frequency, round(relFreq*factor)/factor AS relativeFrequency
+ORDER BY freq DESC
+#+END_SRC
+
+The above Cypher will:
+- interrogate the database to get all known labels (e.g. /Client/,
+  /Transaction/, etc.)
+- Run a sub-query using APOC to get label counts
+- Analyze the label counts against the global label counts
+
+#+CAPTION: Relative Frequency of Labels in our PaySim Graph
+#+NAME: fig:paysim-frequency
+[[file:../static/img/paysim-node_freq.png]]
+
+So most (62%) of our transaction activity is some form of
+ingress/egress where money flows into and out of the network. The
+remaining 38% of activity involves money flowing to and from parties
+in the network. Is there anything interesting about the transactions
+themselves?
+
+Let's take a look.
+
+#+BEGIN_SRC cypher
+// Get the total number of transactions in count and $ value
+MATCH (t:Transaction)
+WITH sum(t.amount) AS globalSum, count(t) AS globalCnt
+
+UNWIND ['CashIn', 'CashOut', 'Payment', 'Debit', 'Transfer'] AS txType
+    CALL apoc.cypher.run('MATCH (t:' + txType + ') RETURN sum(t.amount) as txAmount, count(t) AS txCnt', {}) YIELD value
+    RETURN txType,
+    	value.txAmount AS TotalMarketValue,
+        value.txAmount / globalSum AS `%MarketValue`,
+        round(100 * (toFloat(value.txCnt) / toFloat(globalCnt)))/100 AS `%MarketTransactions`,
+        value.txCnt AS NumberOfTransactions,
+        toFloat(value.txAmount) / toFloat(value.txCnt) AS AvgTransactionValue
+#+END_SRC
+
+The above Cypher performs a pretty basic aggregation of the number of
+transactions by type, the total monetary value, and the average value
+of each transaction.
+
+#+CAPTION: Aggregate Transaction statistical profile
+#+NAME: fig:transaction-stats
+[[file:../static/img/paysim-transaction_freq.png]]
+
+The =CashIn= transactions still dominate in terms of quantity and
+average transaction size, but interestingly =Transfer= transactions
+make up over a 1/3rd of the total market activity in terms the amount
+of money involved even though they're hardly 6% of the total
+transaction volume. In fact, the average =Transfer= involves funds
+/6.25 times/ the average =CashIn= transaction.
+
+What does this mean? *Money is passed around in large quantities more
+so than its injected into or ejected from the network.*
+
+* Finding our First Party Fraud
+Recall that 1st Party Fraud is a form of identity fraud where the
+fraudster either uses either fully synthetic (fake) identifiers or
+steals and uses real identifiers in order to build up some account
+standing (e.g. credit rating or credit line) before "busting out" and
+draining the account into something liquid they can run away with.
+
+In our PaySim version, we've constructed 1st Party Fraudsters that
+generate pools of identifiers like *Emails*, *SSNs*, and *Phone
+Numbers* that they remix into different (ideally unique) combinations
+when creating a client in our network. Then at some time in the
+future, they drain those accounts via an intermediary (a *mule*) and
+conduct a =CashOut= to exflitrate the money from our network.
+
+Our methodology for finding these fraudulent accounts will be as
+follows:
+1. Cull the universe down to potentially fruadulent accounts using
+   community detect methods.
+2. Quantify and filter community members based on similarity.
+3. Identify hot spots (possible initial sources of fraud) using
+   centralitiy measurements.
+4. Visualize the subgraph to illustrate the impact and any anomalies.
+
+** Filtering the Universe with Weakly Connected Components
+Our first step leverages the connectedness of our graph and looks for
+PaySim Clients that share identifiers. Since when we loaded our data
+in [[file:paysim-part2.org][part 2]] creating unique nodes for each instance of an identifier
+(e.g. there's only one SSN of 123-45-6789), it's almost trivial to
+find Clients that share identifiers.
+
+The Weakly Connected Components (TKTKT INSERT LINK) algorithm analyzes
+the graph and identifies "graph components". A "component" is a set of
+nodes and relationships where you can reach each member (node) from
+any other through traversal. (It's called "weakly" as opposed to
+"strongly" connected since we allow traversal irrespective of the
+direction of a relationship.)
+
+TKTKTKT INSERT VISUAL EXAMPLE
+
+The net result: our algorithm identifies all the possible subgraphs of
+Clients that have some identifiers in common.
+
+#+BEGIN_QUOTE
+Sounds almost too easy, right? In practice, it's not uncommon for
+identifiers to be shared among accounts. A simple example is a shared
+mailing address for roomates or family members. In real world fraud
+detection methologies, identifiers tend to be weighted differently.
+#+END_QUOTE
+
+*** Create our WCC Projection
+Since we don't care about all nodes and relationships for our WCC
+approach, we can keep our algorithm focused on just a subgraph and
+load it into memory.
+
+Recall our data model from before:
+
+#+CAPTION: The PaySim 2.1 Data Model
+#+NAME: fig:paysim-2.1-data-model
+[[file:../static/img/paysim-2.1.0.png]]
+
+In our case, we're concerned about only 4 label types:
+- *Client* which is our account/account holder
+- *SSN* which is like a US social security number (or Canadian SNI,
+  etc.)
+- *Email* which should be an email address
+- *Phone* which represents someone's contact phone number
+
+And we only need the relationships that connect nodes of the above
+labels: *HAS_SSN, HAS_EMAIL, HAS_PHONE*.
+
+So let's target the following subgraph:
+
+#+CAPTION: Just our Identifiers in PaySim 2.1
+#+NAME: fig:paysim-identifiers
+[[file:../static/img/simple-identity-model.png]]
+
+#+BEGIN_SRC cypher
+// Load our subgraph called "similarity"
+CALL algo.graph.load('similarity',
+  'Client|SSN|Email|Phone',
+  'HAS_SSN|HAS_EMAIL|HAS_PHONE')
+#+END_SRC
+
+You should get some metadata output telling you some details about the
+type and size of the graph projection.
+
+#+CAPTION: Our "similarity" graph projection output
+#+NAME: fig:paysim-wcc-graph-projection
+[[file:../static/img/paysim-part3-load-wcc.png]]
+
+Easy, peasy! Onto running the algorithm...
+
+*** Compute and tag our WCC groups
+With the subgraph loaded, we can simply let the algorithm do its
+thing. In the interest of learning and sanity checking our work, let's
+first look at the algorithm output before we go much further.
+
+#+BEGIN_SRC cypher
+// Look at our Clients and don't filter any relationships (null)
+CALL algo.wcc.stream('Client', null, {graph:'similarity'})
+YIELD nodeId, setId
+
+// Algos return internal ids, so fetch the actual Node from the db
+WITH algo.asNode(nodeId) AS c, setId
+WITH setId, collect(c.id) AS clients
+
+// Identify groups where there are at least 2 clients
+WITH setId, clients, size(clients) as groupSize
+WHERE groupSize > 1
+RETURN *
+ORDER BY groupSize DESC
+#+END_SRC
+
+Scanning the results, we have a few large clusters and a lot of small
+clusters. Those large clusters will probably be of interest and we'll
+come back to that shortly.
+
+Now let's re-run the algorithm but tag our groups. We'll give each
+matching =Client= node a new property we'll call =fraud_group= and
+assign the =setId= generated by the algorithm. This will let us recall
+the groups at will via basic Cypher against the core database.
+
+#+BEGIN_SRC cypher
+// Tag our possible 1st party fraud groups
+CALL algo.wcc.stream('Client', null, {graph:'similarity'})
+YIELD nodeId, setId
+
+WITH algo.asNode(nodeId) AS c, setId
+WITH setId, collect(c.id) AS clients
+WITH setId, clients, size(clients) AS groupSize
+WHERE groupSize > 1
+
+// For each account, set their group id
+UNWIND clients AS clientId
+    MATCH (c:Client {id:clientId})
+    SET c.fraud_group = setId
+#+END_SRC
+
+For good measure, you could index the =fraud_group= property for
+faster recall.
+
+#+BEGIN_SRC cypher
+CREATE INDEX ON :Client(fraud_group)
+#+END_SRC
+
+*** Sanity Checking WCC's Output
+Lastly, let's sanity check our results. A few queries ago we only
+glanced at the output, but now that we have groups tagged in our
+database and the =fraud_group= property indexed, let's take a deeper
+look at how the communities shake out.
+
+#+BEGIN_SRC cypher
+// Recall our tagged Clients and group them by group size
+MATCH (c:Client) WHERE c.fraud_group IS NOT NULL
+WITH c.fraud_group AS groupId, collect(c.id) AS members
+WITH groupId, size(members) AS groupSize
+WITH collect(groupId) AS groupsOfSize, groupSize
+RETURN groupSize, size(groupsOfSize) AS numOfGroups
+ORDER BY groupSize DESC
+#+END_SRC
+
+What's the data look like?
+
+#+CAPTION: Histogram of Group Size
+#+NAME: fig:paysim-wcc-histogram
+[[file:../static/img/paysim-part3-wcc-analysis.png]]
+
+Ok, wow. Seems we have a simple way to focus on highly-suspect
+communities as the vast majority of accounts that share some
+identifies only form small communities of 2-3 members, but _we have
+some clear anomalies where 10 groups have community sizes of 10 or
+more._ Something fishy has to be going on with them.
+
+Before we move on, let's grab those a few of those group ids for our
+next analysis step.
+
+#+BEGIN_SRC cypher
+MATCH (c:Client) WHERE c.fraud_group IS NOT NULL
+WITH c.fraud_group AS groupId, collect(c.id) AS members
+WITH groupId, size(members) AS groupSize
+WHERE size(members) > 9
+RETURN groupId, groupSize
+ORDER BY groupSize DESC
+#+END_SRC
+
+In our case, it looks like we'll focus on groups =1353= and =1708=
+which both have a group size of 13.
+
+** Analyzing our Suspect Clusters
+Let's really focus in on those suspect groups.
+
+One way to drill in deeper is to look at the group members and see if
+there are any that standout among their peers. In our case, we don't
+have very large groups, but this might still leave us with some
+insight.
+
+*** Creating our Similarity Graph Projection
+
+Like before, we start with a graph projection. This time it will be of
+just the Clients we've assigned to fraud groups and their
+identifiers. The syntax is a tad similar to before, but now we use a
+_Cypher projection_ to target the Labels and Relationships using
+Cypher instead of just a delimited list of values.
+
+#+BEGIN_SRC cypher
+CALL algo.graph.load(
+  'fraud_groups',
+  'MATCH (c:Client) WHERE c.fraud_group IS NOT NULL RETURN id(c) AS id
+   UNION
+   MATCH (n)
+   WHERE n:SSN OR n:Email OR n:Phone
+   RETURN id(n) AS id',
+  'MATCH (n)-[:HAS_SSN|:HAS_EMAIL|:HAS_PHONE]->(id)
+   RETURN id(n) AS source, id(id) AS target',
+  {graph:'cypher'})
+#+END_SRC
+
+Like before, we should get back some metadata related to our
+projection if all goes well.
+
+*** Computing PairWise Similarity
+
+Now we'll use an algorithm called *pairwise similarity* TKTKTK LINK TO
+THIS DOC to compute a similarity score between clients.
+
+#+BEGIN_SRC cypher
+CALL algo.nodeSimilarity.stream('Client', null,{graph:'fraud_groups'})
+YIELD node1, node2, similarity
+RETURN algo.asNode(node1).id AS a1,
+    algo.asNode(node2).id,
+    similarity
+ORDER BY similarity DESC
+#+END_SRC
+
+Since the algorithm looks at each pair of nodes in a fraud group,
+you'll see some redudant info, but the interesting thing to note is
+some Client pairs are clearly more similar than others based on their
+scores.
+
+#+CAPTION: Most similar Clients per PairWise algorithm
+#+NAME: fig:paysim-pairwise-analysis
+[[file:../static/img/paysim-part3-pairwise-analysis.png]]
+
+*** Materializing Similarity into the Graph
+Let's now re-run the algorithm but instead of reporting results let's
+materialize them as =:SIMILAR= relationships in our graph.
+
+#+BEGIN_SRC cypher
+CALL algo.nodeSimilarity('Client', null, {
+    graph:'fraud_groups',
+    write:true,
+    writeRelationshipType:'SIMILAR',
+    writeProperty:'score',
+    direction:'OUTGOING'
+})
+#+END_SRC
+
+We'll now see =:SIMILAR= relationships between =Client= nodes that
+have a computed similarity score. The score itself will appear on the
+new relationship as a =score= property.
+
+Let's take a look.
+
+#+BEGIN_SRC cypher
+MATCH path=(:Client)-[r:SIMILAR]->(:Client)
+RETURN path LIMIT 500
+#+END_SRC
+
+#+CAPTION: Small preview of our Clusters joined by relationships
+#+NAME: fig:paysim-pairwise-visual
+[[file:../static/img/paysim-part3-pairwise-visual.svg]]
+
+What about our suspect groups (1353, 1708)? Let's take a look:
+
+#+BEGIN_SRC cypher
+MATCH path=(c:Client)-[:SIMILAR]->()
+WHERE c.fraud_group IN [1353, 1708]
+RETURN path
+#+END_SRC
+
+#+CAPTION: Fraud Groups 1353 and 1708
+#+NAME: fig:paysim-pairwise-visual-2
+[[file:../static/img/paysim-part3-pairwise-visual2.svg]]
+
+That's cool. They form two similar but slightly different graphs. One
+group (1708) appears to have two highly clusters connected via a
+common intermediary. The other group (1353) has 2 Client accounts that
+form the bridge between two clusters of different sizes.
+
+You may also notice by looking at the names on the nodes they tend to
+share surnames like "Dodson" and "Wallace." Pretty neat.
+
+#+BEGIN_QUOTE
+You may be wondering: why are there 2 shades of yellow in the
+visualizations? We'll get to that in a moment...but if you've read the
+previous PaySim posts you may already know that those lighter shaded
+nodes are our secret Mules. (Oh sorry, spoiler alert?)
+#+END_QUOTE
+
+** Quantifying Centrality
+We just got a preview of how we can visually identify highly-connected
+nodes while running our pairwise similarity algorithm. Let's do it now
+algorithmically.
+
+*** Computing Centrality
+Since centrality is computed within a graph component or cluster,
+let's target group =1708= first for our analysis. We won't predefine a
+graph projection like before since we're going to be only working with
+subgraphs with 13 members. (Why 13? Go back and see the
+[[fig:paysim-wcc-histogram][Histogram of Group Size]].)
+
+TKTKTK EXPLAIN ALGO
+
+#+BEGIN_SRC cypher
+CALL algo.degree.stream(
+    'MATCH (c:Client) WHERE c.fraud_group=1708 RETURN id(c) AS id',
+    'MATCH (c1)-[r:SIMILAR]->(c2)
+        RETURN id(c1) AS source, id(c2) AS target, r.score AS weight',
+    {graph:'cypher', weightProperty:'weight', direction:'outgoing'})
+YIELD nodeId, score
+RETURN algo.asNode(nodeId).id AS clientId, score
+ORDER BY score DESC
+#+END_SRC

@@ -118,16 +118,23 @@ in [[file:paysim-part2.org][part 2]] creating unique nodes for each instance of 
 (e.g. there's only one SSN of 123-45-6789), it's almost trivial to
 find Clients that share identifiers.
 
-The Weakly Connected Components (TKTKT INSERT LINK) algorithm analyzes
-the graph and identifies "graph components". A "component" is a set of
-nodes and relationships where you can reach each member (node) from
-any other through traversal. (It's called "weakly" as opposed to
-"strongly" connected since we allow traversal irrespective of the
-direction of a relationship.)
+The [[https://neo4j.com/docs/graph-algorithms/current/algorithms/wcc/][Weakly Connected Components]] algorithm analyzes the graph and
+identifies "graph components". A [[https://en.wikipedia.org/wiki/Component_(graph_theory)][component]] is a set of nodes and
+relationships where you can reach each member (node) from any other
+through traversal. It's called "weakly" since we don't account for the
+directionality of relationships.
 
-TKTKTKT INSERT VISUAL EXAMPLE
+#+BEGIN_QUOTE
+Connected component algorithms are a type of community detection
+algorithm. They're great for understanding the structure of a
+graph.
+#+END_QUOTE
 
-The net result: our algorithm identifies all the possible subgraphs of
+#+CAPTION: "A graph with three components" by David Eppstein (Public Domain, Wikipedia, 2007)
+#+NAME: fig:three-components
+[[file:../static/img/3rdparty/Pseudoforest.svg]]
+
+The net result: the algorithm identifies all the possible subgraphs of
 Clients that have some identifiers in common.
 
 #+BEGIN_QUOTE
@@ -310,11 +317,13 @@ projection if all goes well.
 
 *** Computing PairWise Similarity
 
-Now we'll use an algorithm called *pairwise similarity* TKTKTK LINK TO
-THIS DOC to compute a similarity score between clients.
+Now we'll use an algorithm called [[https://neo4j.com/docs/graph-algorithms/current/algorithms/node-similarity/][pair-wise similarity]] to compute a
+similarity score between clients. This algorithm computes what's
+called the _Jaccard metric_, an approach to quantifying how similar
+two nodes are in the same connected graph.
 
 #+BEGIN_SRC cypher
-CALL algo.nodeSimilarity.stream('Client', null,{graph:'fraud_groups'})
+CALL algo.nodeSimilarity.stream('Client', null, {graph:'fraud_groups'})
 YIELD node1, node2, similarity
 RETURN algo.asNode(node1).id AS a1,
     algo.asNode(node2).id,
@@ -392,6 +401,17 @@ We just got a preview of how we can visually identify highly-connected
 nodes while running our pairwise similarity algorithm. Let's do it now
 algorithmically.
 
+In this case, we can use a tried and true algorithm called [[https://neo4j.com/docs/graph-algorithms/current/labs-algorithms/degree-centrality/][degree
+centrality]] originally proposed in 1979.[fn:1] It's great at finding
+"important" nodes in a social network. It just so happens a mobile
+money network is a form of social network!
+
+#+BEGIN_QUOTE
+You've probably heard about [[https://neo4j.com/docs/graph-algorithms/current/algorithms/page-rank/][Page Rank]], made popular by Google as a
+core feature of Google's original relevancy model. We're not using
+Page Rank here, but just a fun fact.
+#+END_QUOTE
+
 *** Computing Centrality
 Since centrality is computed within a graph component or cluster,
 let's target group =1708= first for our analysis. We won't predefine a
@@ -399,7 +419,6 @@ graph projection like before since we're going to be only working with
 subgraphs with 13 members. (Why 13? Go back and see the
 [[fig:paysim-wcc-histogram][Histogram of Group Size]].)
 
-TKTKTK EXPLAIN ALGO
 
 #+BEGIN_SRC cypher
 CALL algo.degree.stream(
@@ -411,3 +430,7 @@ YIELD nodeId, score
 RETURN algo.asNode(nodeId).id AS clientId, score
 ORDER BY score DESC
 #+END_SRC
+
+* Footnotes
+
+[fn:1] Linton C. Freeman, [[http://leonidzhukov.net/hse/2014/socialnetworks/papers/freeman79-centrality.pdf][Centrality in Social Networks Conceptual Clarification]]

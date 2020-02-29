@@ -5,6 +5,8 @@ date: '2017-09-19T11:48:58.385Z'
 tags: [archives, linux, openbsd]
 ---
 
+> Note: This is an old post from when I wrote on medium.com...formatting may be wonky here until I clean it up.
+
 ![Matterhorn…if you squint you can see Puffy up there, I swear. ([https://commons.wikimedia.org/wiki/File:Matterhorn\_from\_Domh%C3%BCtte\_-\_2.jpg](https://commons.wikimedia.org/wiki/File:Matterhorn_from_Domh%C3%BCtte_-_2.jpg))](https://cdn-images-1.medium.com/max/800/1*Ird9QLfasg60n7LVB6RCpw.jpeg)
 Matterhorn…if you squint you can see Puffy up there, I swear. ([https://commons.wikimedia.org/wiki/File:Matterhorn\_from\_Domh%C3%BCtte\_-\_2.jpg](https://commons.wikimedia.org/wiki/File:Matterhorn_from_Domh%C3%BCtte_-_2.jpg))
 

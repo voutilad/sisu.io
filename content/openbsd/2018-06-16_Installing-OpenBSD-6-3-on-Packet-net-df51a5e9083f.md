@@ -5,6 +5,8 @@ date: '2018-06-16T21:57:46.516Z'
 tags: [archives, openbsd, virtualization]
 ---
 
+> Note: This is an old post from when I wrote on medium.com...formatting may be wonky here until I clean it up.
+
 ![Image by Kurt Edblom shared under CC BY-SA 2.0 ([https://flic.kr/p/fanASg](https://flic.kr/p/fanASg))](https://cdn-images-1.medium.com/max/800/1*fhSbHyChf5Pd-L_ryF0Khw.jpeg)
 Image by Kurt Edblom shared under CC BY-SA 2.0 ([https://flic.kr/p/fanASg](https://flic.kr/p/fanASg))
 

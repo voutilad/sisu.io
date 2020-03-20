@@ -1,10 +1,10 @@
 +++
 title = "Analyzing First Party Fraud with Neo4j 👺 (PaySim pt.3)"
 author = ["Dave Voutila"]
-description = "How well does our PaySim enhancements model 1st party fraud and how can we detect it?"
+description = "How can we leverage Graph Theory to detect 1st Party Fraud in our PaySim network?"
 date = 2020-03-20
-lastmod = 2020-03-20T14:32:42-04:00
-tags = ["neo4j", "fraud", "java", "paysim"]
+lastmod = 2020-03-20T14:37:50-04:00
+tags = ["neo4j", "fraud", "java", "paysim", "data-science"]
 draft = false
 +++
 
@@ -75,7 +75,7 @@ The above Cypher will:
 -   Run a sub-query using APOC to get label counts
 -   Analyze the label counts against the global label counts
 
-<a id="org46a9125"></a>
+<a id="org242ef48"></a>
 
 {{< figure src="/img/paysim-node_freq.png" caption="Figure 1: Relative Frequency of Labels in our PaySim Graph" >}}
 
@@ -108,7 +108,7 @@ The above Cypher performs a pretty basic aggregation of the number of
 transactions by type, the total monetary value, and the average value
 of each transaction.
 
-<a id="org2c92b4c"></a>
+<a id="orgcbcea76"></a>
 
 {{< figure src="/img/paysim-transaction_freq.png" caption="Figure 2: Aggregate Transaction statistical profile" >}}
 
@@ -172,7 +172,7 @@ directionality of relationships.
 > algorithm. They're great for understanding the structure of a
 > graph.
 
-<a id="org54aa0ac"></a>
+<a id="org0fca7b2"></a>
 
 {{< figure src="/img/3rdparty/Pseudoforest.svg" caption="Figure 3: \"A graph with three components\" by David Eppstein (Public Domain, Wikipedia, 2007)" >}}
 
@@ -193,7 +193,7 @@ load it into memory.[^fn:2]
 
 Recall our data model we built out in [part 1]({{< relref "paysim" >}}):
 
-<a id="orgf8f251c"></a>
+<a id="org03c9a69"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 4: The PaySim 2.1 Data Model" >}}
 
@@ -210,7 +210,7 @@ labels: **HAS\_SSN, HAS\_EMAIL, HAS\_PHONE**.
 
 So let's target the following subgraph:
 
-<a id="org2c59160"></a>
+<a id="orgf0b1f48"></a>
 
 {{< figure src="/img/simple-identity-model.png" caption="Figure 5: Just our Identifiers in PaySim 2.1" >}}
 
@@ -225,7 +225,7 @@ CALL gds.graph.create.estimate(
     ['HAS_SSN', 'HAS_EMAIL', 'HAS_PHONE'])
 ```
 
-<a id="org7d20bb0"></a>
+<a id="org66f5c2f"></a>
 
 {{< figure src="/img/paysim-part3-wcc-estimate.png" caption="Figure 6: Our estimate for our Graph Projection" >}}
 
@@ -250,7 +250,7 @@ You should see some metadata output telling you some details about the
 type and size of the graph projection. It'll detail how many
 relationships and nodes were processed plus some other facts.
 
-<a id="org3bf28b1"></a>
+<a id="orgdc663ab"></a>
 
 {{< figure src="/img/paysim-part3-load-wcc.png" caption="Figure 7: Our \"wccGroups\" graph projection output" >}}
 
@@ -286,7 +286,7 @@ Scanning the results, we have a few large clusters and a lot of small
 clusters. Those large clusters will probably be of interest and we'll
 come back to that shortly.
 
-<a id="org657c663"></a>
+<a id="org0e9e482"></a>
 
 {{< figure src="/img/paysim-part3-wcc-stream.png" caption="Figure 8: Our largest graph Components per WCC" >}}
 
@@ -341,7 +341,7 @@ ORDER BY groupSize DESC
 
 What's the data look like?
 
-<a id="org6515739"></a>
+<a id="org4dc882f"></a>
 
 {{< figure src="/img/paysim-part3-wcc-analysis.png" caption="Figure 9: Histogram of Group Size" >}}
 
@@ -362,7 +362,7 @@ MATCH p=(c:Client {fraud_group:groupId})-[:HAS_SSN|HAS_EMAIL|HAS_PHONE]->()
 RETURN p
 ```
 
-<a id="orgba94e94"></a>
+<a id="orga678806"></a>
 
 {{< figure src="/img/paysim-part3-wcc-large-groups.svg" caption="Figure 10: Our Fraud Groups (of size > 8)" >}}
 
@@ -398,7 +398,7 @@ WHERE c.fraud_group IS NULL
 RETURN p
 ```
 
-<a id="org2ea0ff6"></a>
+<a id="org16d40e5"></a>
 
 {{< figure src="/img/paysim-part3-external-transactions.svg" caption="Figure 11: External Transactions with our Large Fraud Groups" >}}
 
@@ -426,7 +426,7 @@ UNWIND labels(txn) AS txnType
     RETURN distinct(txnType), count(txnType)
 ```
 
-<a id="org1f38855"></a>
+<a id="orgde687e3"></a>
 
 {{< figure src="/img/paysim-part3-external-transactions-analysis.png" caption="Figure 12: An Analysis of Transactions between our Fraud Groups and Others" >}}
 
@@ -468,7 +468,7 @@ RETURN count(r)
 
 Now how do our simplified 2nd-level groups look?
 
-<a id="org69a13b6"></a>
+<a id="orgda07be0"></a>
 
 {{< figure src="/img/paysim-part3-second-level.svg" caption="Figure 13: Our 2nd-Level Fraud Groups" >}}
 
@@ -521,7 +521,7 @@ RETURN secondGroupId, size(members) AS groupSize
 ORDER BY groupSize DESC
 ```
 
-<a id="org19fdc3e"></a>
+<a id="org2f334ab"></a>
 
 {{< figure src="/img/paysim-part3-second-level-sizes.png" caption="Figure 14: How large are our 2nd Level Fraud Groups?" >}}
 
@@ -545,7 +545,7 @@ Let's say we want to tackle that massive 140 Client potential fraud
 ring. Looking at the graph visually, there appear to be 3 Client
 accounts that tie the whole thing together:
 
-<a id="orgc48c179"></a>
+<a id="orgbc30609"></a>
 
 {{< figure src="/img/paysim-part3-second-level-targets.png" caption="Figure 15: Our potential Targets" >}}
 
@@ -582,7 +582,7 @@ RETURN c.name AS name, centrality ORDER BY centrality DESC
 
 Let's take a look at the highest scores:
 
-<a id="orgae92408"></a>
+<a id="orge5f94f4"></a>
 
 {{< figure src="/img/paysim-part3-centrality-v1.png" caption="Figure 16: Clients of 2nd Level Fraud Group 1 sorted by Centrality" >}}
 
@@ -629,7 +629,7 @@ RETURN name, newScore, original ORDER BY newScore DESC
 
 Bingo! Our targets are now in the Top 3.
 
-<a id="org05d9d09"></a>
+<a id="orgb5e245e"></a>
 
 {{< figure src="/img/paysim-part3-centrality-v2.png" caption="Figure 17: Our bespoke Betweenness Scoring" >}}
 

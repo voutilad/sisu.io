@@ -1,9 +1,9 @@
 #+TITLE: Analyzing First Party Fraud with Neo4j 👺 (PaySim pt.3)
-#+DESCRIPTION: How well does our PaySim enhancements model 1st party fraud and how can we detect it?
+#+DESCRIPTION: How can we leverage Graph Theory to detect 1st Party Fraud in our PaySim network?
 #+DATE: 2020-03-20
 #+OPTIONS: toc:2
 #+hugo_auto_set_lastmod: t
-#+hugo_tags: neo4j fraud java paysim
+#+hugo_tags: neo4j fraud java paysim data-science
 #+hugo_base_dir: ..
 #+hugo_section: posts
 

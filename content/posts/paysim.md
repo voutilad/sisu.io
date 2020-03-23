@@ -3,7 +3,7 @@ title = "Simulating Mobile Money Fraud 🤑 (PaySim pt.1)"
 author = ["Dave Voutila"]
 description = "Creating a realistic data-set for analysis using PaySim"
 date = 2020-02-13
-lastmod = 2020-02-17T08:52:57-05:00
+lastmod = 2020-03-23T11:15:11-04:00
 tags = ["neo4j", "fraud", "java", "paysim"]
 draft = false
 +++
@@ -49,7 +49,7 @@ exploring ways to detect fraudulent behavior.
 > Check out their initial dataset posted to kaggle:
 > <https://www.kaggle.com/ntnu-testimon/paysim1>
 
-<a id="org77e1f5b"></a>
+<a id="org92aecab"></a>
 
 {{< figure src="/img/kaggle-arjunjoshua-paysim-fingerprints.png" caption="Figure 1: \"...fingerprints of [PaySim] transactions over time\" by Arjun Joshua" >}}
 
@@ -111,7 +111,7 @@ Let's jump a bit ahead and talk about what PaySim produces with the
 help of a graph visualization and then dive into the core components
 of the simulation: _Agents and Transactions._
 
-<a id="org7050365"></a>
+<a id="orga757507"></a>
 
 {{< figure src="/img/simplified-data-model.png" caption="Figure 2: Graphical representation of the PaySim data model" >}}
 
@@ -322,7 +322,7 @@ analagous to the original PaySim project, you can run the `main()`
 method in the `OriginalPaySim` class and it will write out all the
 expected output files to disk.
 
-<a id="org0542e03"></a>
+<a id="org8c231f2"></a>
 
 {{< figure src="/img/IteratingPaySim.svg" caption="Figure 3: IteratingPaySim Implementation (high-level)" >}}
 
@@ -394,22 +394,24 @@ the Fraudster has access to the payment card they can cash out by
 buying gift cards or prepaid cards that can in turn either be used or
 sold to convert to actual cash.
 
-_Can we make it a tad more realistic?_
+**Can we make it a tad more realistic?**
 
 -   Fraudsters try to completely drain a Victim's account, performing
     Transfers up to the network "transfer limit" set by the model
-    parameters. /In real world credit card fraud, cards are usually
-    "tested" through small transactions or pre-authorization before
-    being used for big purchases./
+    parameters.
+    -   In real world credit card fraud, cards are usually "tested"
+        through small transactions or pre-authorization before being used
+        for big purchases.
 
 -   A PaySim Fraudster picks a Victim from the simulation universe at
-    random. In the real world, while there's some behavior that may
-    appear random, /Fraudsters often breach or compromise a Merchant's
-    POS systems (both offline and online) to initially gain access to
-    victims' accounts./
+    random.
+    -   In the real world, while there's some behavior that may appear
+        random, Fraudsters often breach or compromise a Merchant's POS
+        systems (both offline and online) to initially gain access to
+        victims' accounts.
 
 With the above in mind, let's first talk about turning our generic
-PaySim fraudster into a 3rd Party Fraudster.
+PaySim fraudster into a **3rd Party Fraudster.**
 
 
 #### Improving 3rd Party Fraudsters {#improving-3rd-party-fraudsters}
@@ -480,7 +482,7 @@ What should it look like in the end? From a graph perspective, there's
 a pretty trivial way to incorporate identities with Clients: relate
 each Client to an instance of an Identity.
 
-<a id="org0808ccf"></a>
+<a id="orgb5e173b"></a>
 
 {{< figure src="/img/simple-identity-model.png" caption="Figure 4: Pretty simple model: Client's have one or many identifiers" >}}
 
@@ -580,11 +582,11 @@ run standalone or embedded. We've also got an understanding of our
 data model and how we plan on adapting it to our graph model, laying
 the foundation. Our data model is also slightly different.
 
-<a id="org81a18f1"></a>
+<a id="org146f78e"></a>
 
 {{< figure src="/img/paysim-2.1.0-part1.png" caption="Figure 5: Our Updated PaySim 2.1 Data Model" >}}
 
-You'll notice that unlike [what we started with](#org7050365), it now provides
+You'll notice that unlike [what we started with](#orga757507), it now provides
 identifiers (e.g. `Phone`, `Email`, `SSN`) for each Client account
 (which may or may not be a Mule).
 

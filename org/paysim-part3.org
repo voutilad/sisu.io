@@ -7,13 +7,14 @@
 #+hugo_base_dir: ..
 #+hugo_section: posts
 
-#+CAPTION: A Preview of What's to Come TKTKTKT REPLACE!!!
+#+CAPTION: A Preview of What's to Come
 #+FIG: paysim-part3-preview
 [[file:../static/img/paysim-part3-banner.png]]
 
 If you've followed along in the PaySim series of posts or at least
 discovered [[https://github.com/voutilad/paysim-demo][the demo project]], you've now got a graph representing 30
-days of financial transactions in a simulated financial network.
+days of financial transactions in a simulated financial network
+running inside your Neo4j 3.5 database.
 
 Somewhere in that haystack are our [[file:paysim.org::Enhancing PaySim's Fraudsters][fraudsters]] we created previously,
 or at least the result of their malicious behavior.
@@ -253,12 +254,11 @@ instance by its internal id and then analyze our groupings:
 // Call the WCC algorithm using our native graph projection
 CALL gds.wcc.stream('wccGroups') YIELD nodeId, componentId
 
-// Algos return internal ids, so fetch the actual Node from the db
-// and use its paysim id
-WITH componentId, collect(gds.util.asNode(nodeId).id) AS clientIds
+// Fetch the Node instance from the db and use its PaySim id
+WITH componentId, collect(gds.util.asNode(nodeId).id) AS clients
 
 // Identify groups where there are at least 2 clients
-WITH *, size(clientIds) as groupSize WHERE groupSize > 1
+WITH *, size(clients) as groupSize WHERE groupSize > 1
 RETURN * ORDER BY groupSize DESC LIMIT 1000
 #+END_SRC
 
@@ -281,7 +281,7 @@ against the core database.
 // Call the WCC algorithm using our native graph projection
 CALL gds.wcc.stream('wccGroups') YIELD nodeId, componentId
 
-// Algos return internal ids, so fetch the actual Node from the db
+// Fetch the Node instance from the db and use its PaySim id
 WITH componentId, collect(gds.util.asNode(nodeId).id) AS clientIds
 WITH *, size(clientIds) AS groupSize WHERE groupSize > 1
 
@@ -349,7 +349,7 @@ yellow) that appear to share identifiers like SSN, Email, and Phone
 numbers (the nodes in the purplish color).
 
 ** Analyzing our Suspicious Groups
-Now that we've identified Client members of some suspcious groups,
+Now that we've identified Client members of some suspicious groups,
 what if we look at the other Clients outside the group they've
 transacted with?
 
@@ -461,7 +461,7 @@ trivial.
 You may wonder, why didn't we use this procedure before instead of the
 =gds.wcc.stream= procedure? Well, last time we didn't want to deal
 with components with only a single Client because they're not very
-suspcicous in our case.
+suspicicous in our case.
 #+END_QUOTE
 
 Run the following:

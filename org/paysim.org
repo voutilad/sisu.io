@@ -348,22 +348,26 @@ the Fraudster has access to the payment card they can cash out by
 buying gift cards or prepaid cards that can in turn either be used or
 sold to convert to actual cash.
 
-/Can we make it a tad more realistic?/
+*Can we make it a tad more realistic?*
 
 - Fraudsters try to completely drain a Victim's account, performing
   Transfers up to the network "transfer limit" set by the model
-  parameters. /In real world credit card fraud, cards are usually
-  "tested" through small transactions or pre-authorization before
-  being used for big purchases./
+  parameters.
+
+  + In real world credit card fraud, cards are usually "tested"
+    through small transactions or pre-authorization before being used
+    for big purchases.
 
 - A PaySim Fraudster picks a Victim from the simulation universe at
-  random. In the real world, while there's some behavior that may
-  appear random, /Fraudsters often breach or compromise a Merchant's
-  POS systems (both offline and online) to initially gain access to
-  victims' accounts./
+  random.
+
+  + In the real world, while there's some behavior that may appear
+    random, Fraudsters often breach or compromise a Merchant's POS
+    systems (both offline and online) to initially gain access to
+    victims' accounts.
 
 With the above in mind, let's first talk about turning our generic
-PaySim fraudster into a 3rd Party Fraudster.
+PaySim fraudster into a *3rd Party Fraudster.*
 
 *** Improving 3rd Party Fraudsters
 We'll enhance our 3rd-party Fraudsters to incorporate a few new

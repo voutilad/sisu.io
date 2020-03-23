@@ -3,7 +3,7 @@ title = "Analyzing First Party Fraud with Neo4j 👺 (PaySim pt.3)"
 author = ["Dave Voutila"]
 description = "How can we leverage Graph Theory to detect 1st Party Fraud in our PaySim network?"
 date = 2020-03-20
-lastmod = 2020-03-20T14:37:50-04:00
+lastmod = 2020-03-23T09:48:29-04:00
 tags = ["neo4j", "fraud", "java", "paysim", "data-science"]
 draft = false
 +++
@@ -30,7 +30,8 @@ draft = false
 
 If you've followed along in the PaySim series of posts or at least
 discovered [the demo project](https://github.com/voutilad/paysim-demo), you've now got a graph representing 30
-days of financial transactions in a simulated financial network.
+days of financial transactions in a simulated financial network
+running inside your Neo4j 3.5 database.
 
 Somewhere in that haystack are our [fraudsters]({{< relref "paysim" >}}) we created previously,
 or at least the result of their malicious behavior.
@@ -75,7 +76,7 @@ The above Cypher will:
 -   Run a sub-query using APOC to get label counts
 -   Analyze the label counts against the global label counts
 
-<a id="org242ef48"></a>
+<a id="orgd06d2fd"></a>
 
 {{< figure src="/img/paysim-node_freq.png" caption="Figure 1: Relative Frequency of Labels in our PaySim Graph" >}}
 
@@ -108,7 +109,7 @@ The above Cypher performs a pretty basic aggregation of the number of
 transactions by type, the total monetary value, and the average value
 of each transaction.
 
-<a id="orgcbcea76"></a>
+<a id="orgd88f7b4"></a>
 
 {{< figure src="/img/paysim-transaction_freq.png" caption="Figure 2: Aggregate Transaction statistical profile" >}}
 
@@ -172,7 +173,7 @@ directionality of relationships.
 > algorithm. They're great for understanding the structure of a
 > graph.
 
-<a id="org0fca7b2"></a>
+<a id="orga2d73a2"></a>
 
 {{< figure src="/img/3rdparty/Pseudoforest.svg" caption="Figure 3: \"A graph with three components\" by David Eppstein (Public Domain, Wikipedia, 2007)" >}}
 
@@ -193,7 +194,7 @@ load it into memory.[^fn:2]
 
 Recall our data model we built out in [part 1]({{< relref "paysim" >}}):
 
-<a id="org03c9a69"></a>
+<a id="org6aa35d9"></a>
 
 {{< figure src="/img/paysim-2.1.0.png" caption="Figure 4: The PaySim 2.1 Data Model" >}}
 
@@ -210,7 +211,7 @@ labels: **HAS\_SSN, HAS\_EMAIL, HAS\_PHONE**.
 
 So let's target the following subgraph:
 
-<a id="orgf0b1f48"></a>
+<a id="org07ad343"></a>
 
 {{< figure src="/img/simple-identity-model.png" caption="Figure 5: Just our Identifiers in PaySim 2.1" >}}
 
@@ -225,7 +226,7 @@ CALL gds.graph.create.estimate(
     ['HAS_SSN', 'HAS_EMAIL', 'HAS_PHONE'])
 ```
 
-<a id="org66f5c2f"></a>
+<a id="org37d75b6"></a>
 
 {{< figure src="/img/paysim-part3-wcc-estimate.png" caption="Figure 6: Our estimate for our Graph Projection" >}}
 
@@ -250,7 +251,7 @@ You should see some metadata output telling you some details about the
 type and size of the graph projection. It'll detail how many
 relationships and nodes were processed plus some other facts.
 
-<a id="orgdc663ab"></a>
+<a id="orgae4738b"></a>
 
 {{< figure src="/img/paysim-part3-load-wcc.png" caption="Figure 7: Our \"wccGroups\" graph projection output" >}}
 
@@ -273,12 +274,11 @@ instance by its internal id and then analyze our groupings:
 // Call the WCC algorithm using our native graph projection
 CALL gds.wcc.stream('wccGroups') YIELD nodeId, componentId
 
-// Algos return internal ids, so fetch the actual Node from the db
-// and use its paysim id
-WITH componentId, collect(gds.util.asNode(nodeId).id) AS clientIds
+// Fetch the Node instance from the db and use its PaySim id
+WITH componentId, collect(gds.util.asNode(nodeId).id) AS clients
 
 // Identify groups where there are at least 2 clients
-WITH *, size(clientIds) as groupSize WHERE groupSize > 1
+WITH *, size(clients) as groupSize WHERE groupSize > 1
 RETURN * ORDER BY groupSize DESC LIMIT 1000
 ```
 
@@ -286,7 +286,7 @@ Scanning the results, we have a few large clusters and a lot of small
 clusters. Those large clusters will probably be of interest and we'll
 come back to that shortly.
 
-<a id="org0e9e482"></a>
+<a id="org0b195e0"></a>
 
 {{< figure src="/img/paysim-part3-wcc-stream.png" caption="Figure 8: Our largest graph Components per WCC" >}}
 
@@ -301,7 +301,7 @@ against the core database.
 // Call the WCC algorithm using our native graph projection
 CALL gds.wcc.stream('wccGroups') YIELD nodeId, componentId
 
-// Algos return internal ids, so fetch the actual Node from the db
+// Fetch the Node instance from the db and use its PaySim id
 WITH componentId, collect(gds.util.asNode(nodeId).id) AS clientIds
 WITH *, size(clientIds) AS groupSize WHERE groupSize > 1
 
@@ -341,7 +341,7 @@ ORDER BY groupSize DESC
 
 What's the data look like?
 
-<a id="org4dc882f"></a>
+<a id="org54c7ee0"></a>
 
 {{< figure src="/img/paysim-part3-wcc-analysis.png" caption="Figure 9: Histogram of Group Size" >}}
 
@@ -362,7 +362,7 @@ MATCH p=(c:Client {fraud_group:groupId})-[:HAS_SSN|HAS_EMAIL|HAS_PHONE]->()
 RETURN p
 ```
 
-<a id="orga678806"></a>
+<a id="org82ce1ab"></a>
 
 {{< figure src="/img/paysim-part3-wcc-large-groups.svg" caption="Figure 10: Our Fraud Groups (of size > 8)" >}}
 
@@ -373,7 +373,7 @@ numbers (the nodes in the purplish color).
 
 ### Analyzing our Suspicious Groups {#analyzing-our-suspicious-groups}
 
-Now that we've identified Client members of some suspcious groups,
+Now that we've identified Client members of some suspicious groups,
 what if we look at the other Clients outside the group they've
 transacted with?
 
@@ -398,7 +398,7 @@ WHERE c.fraud_group IS NULL
 RETURN p
 ```
 
-<a id="org16d40e5"></a>
+<a id="org1b2cc26"></a>
 
 {{< figure src="/img/paysim-part3-external-transactions.svg" caption="Figure 11: External Transactions with our Large Fraud Groups" >}}
 
@@ -426,7 +426,7 @@ UNWIND labels(txn) AS txnType
     RETURN distinct(txnType), count(txnType)
 ```
 
-<a id="orgde687e3"></a>
+<a id="org3ae8d10"></a>
 
 {{< figure src="/img/paysim-part3-external-transactions-analysis.png" caption="Figure 12: An Analysis of Transactions between our Fraud Groups and Others" >}}
 
@@ -468,7 +468,7 @@ RETURN count(r)
 
 Now how do our simplified 2nd-level groups look?
 
-<a id="orgda07be0"></a>
+<a id="org824163b"></a>
 
 {{< figure src="/img/paysim-part3-second-level.svg" caption="Figure 13: Our 2nd-Level Fraud Groups" >}}
 
@@ -488,7 +488,7 @@ trivial.
 > You may wonder, why didn't we use this procedure before instead of the
 > `gds.wcc.stream` procedure? Well, last time we didn't want to deal
 > with components with only a single Client because they're not very
-> suspcicous in our case.
+> suspicicous in our case.
 
 Run the following:
 
@@ -521,7 +521,7 @@ RETURN secondGroupId, size(members) AS groupSize
 ORDER BY groupSize DESC
 ```
 
-<a id="org2f334ab"></a>
+<a id="org25a543a"></a>
 
 {{< figure src="/img/paysim-part3-second-level-sizes.png" caption="Figure 14: How large are our 2nd Level Fraud Groups?" >}}
 
@@ -545,7 +545,7 @@ Let's say we want to tackle that massive 140 Client potential fraud
 ring. Looking at the graph visually, there appear to be 3 Client
 accounts that tie the whole thing together:
 
-<a id="orgbc30609"></a>
+<a id="org3583f32"></a>
 
 {{< figure src="/img/paysim-part3-second-level-targets.png" caption="Figure 15: Our potential Targets" >}}
 
@@ -582,7 +582,7 @@ RETURN c.name AS name, centrality ORDER BY centrality DESC
 
 Let's take a look at the highest scores:
 
-<a id="orge5f94f4"></a>
+<a id="org6464ab4"></a>
 
 {{< figure src="/img/paysim-part3-centrality-v1.png" caption="Figure 16: Clients of 2nd Level Fraud Group 1 sorted by Centrality" >}}
 
@@ -629,7 +629,7 @@ RETURN name, newScore, original ORDER BY newScore DESC
 
 Bingo! Our targets are now in the Top 3.
 
-<a id="orgb5e245e"></a>
+<a id="orgdbc6ecd"></a>
 
 {{< figure src="/img/paysim-part3-centrality-v2.png" caption="Figure 17: Our bespoke Betweenness Scoring" >}}
 

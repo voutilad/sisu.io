@@ -7,5 +7,5 @@ if [ `uname -s` == "OpenBSD" ]; then
 else
   RSYNC_CMD=rsync
 fi
-${RSYNC_CMD} -avz -e "ssh -i ~/.ssh/id_moon" ./public/ moon:/var/www/sites/www.sisu.io/
+${RSYNC_CMD} -avz -e "ssh -i ~/.ssh/id_moon" ./public/ moon.sisu.io:/var/www/sites/www.sisu.io/
 echo "-- DONE!"

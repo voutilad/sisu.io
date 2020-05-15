@@ -124,7 +124,7 @@ generate pools of identifiers like *Emails*, *SSNs*, and *Phone
 Numbers* that they remix into different (ideally unique) combinations
 when creating a client in our network. Then at some time in the
 future, they drain those accounts via an intermediary (a *mule*) and
-conduct a =CashOut= to exflitrate the money from our network.
+conduct a =CashOut= to exfiltrate the money from our network.
 
 Our methodology for finding these fraudulent accounts will be as
 follows:
@@ -411,9 +411,9 @@ groups are *all Transfers.* Kinda fishy!
 We've now identified four potential fraud rings. Let's tag them and
 relate them to one another to make further analysis easier.
 
-We'll simplify how our suspect Clients relat to one another connecting
-them via direct =TRANSACTED_WITH= relationships if they've performed a
-Transaction with one another:
+We'll simplify how our suspect Clients relate to one another
+connecting them via direct =TRANSACTED_WITH= relationships if they've
+performed a Transaction with one another:
 
 #+BEGIN_SRC cypher
 // Recall our tagged Clients and group them by group size
@@ -505,7 +505,7 @@ to the others! Probably a high-value fraud ring we can try breaking up.
 ** Quantitatively Identifying Suspects
 First thing we can do is use our eyeballs and our intuition. Graphs
 make it easy for humans to start asking questions because we're
-glorified pattern-recognition biocomputers doing it since birth using
+glorified pattern recognition biocomputers doing it since birth using
 any of our senses as input.
 
 But how can we do this algorithmically?
@@ -519,7 +519,7 @@ accounts that tie the whole thing together:
 #+NAME: fig:paysim-second-level-targets
 file:../static/img/paysim-part3-second-level-targets.png
 
-How can we programatically target =Thomas Gomez=, =Samuel Petty=, and
+How can we programmatically target =Thomas Gomez=, =Samuel Petty=, and
 =Luke Oneal=?
 
 *** Computing Betweenness Centrality
@@ -612,7 +612,7 @@ critical steps in our analysis of our financial transaction data:
    the groups we identified looked very different than they first
    appeared!
 4. We re-ran WCC and retagged our suspects.
-5. We algorithmically found a way to identify lynchpins in our largest
+5. We algorithmically found a way to identify linchpins in our largest
    potential fraud network using a combination of /Betweenness
    Centrality/ and some old fashioned intuition!
 

@@ -1,0 +1,316 @@
+#+TITLE: PaySim Part 4 TBA
+#+DESCRIPTION: tba
+#+DATE 2020-05-30
+#+hugo_draft: t
+#+hugo_auto_set_lastmod: t
+#+hugo_tags: neo4j fraud java paysim data-science
+#+hugo_base_dir: ..
+#+hugo_section: posts
+
+Setup:
+
+#+BEGIN_SRC cypher
+MATCH (c:Client) SET c.victimStatus = 0
+#+END_SRC
+
+Sample our victims, making a random cohort of about 10% of the total
+number of 3rd Party Fraud victims. We'll use an additional Label to
+annotate our Clients in lieu of a property. Why? This lets us easily
+filter within a graph projection.
+
+#+BEGIN_SRC cypher
+  MATCH (t:Transaction {fraud:true})<-[:PERFORMED]-(c:Client) USING INDEX t:Transaction(fraud)
+  WITH DISTINCT c AS c
+  // Let's flag all our true victims so we can check our work later
+  SET c.knownVictim = 1
+  WITH collect(c.id) AS victimIds
+  // Now we take a random sample of true victims to make our training set
+  WITH apoc.coll.randomItems(victimIds, toInteger(0.20 * toFloat(size(victimIds)))) AS cohort
+
+  UNWIND cohort AS victimId
+  MATCH (c:Client {id:victimId})
+  // We'll use both a property and a label...both come in handy later
+  SET c:FraudVictim
+  SET c.victimStatus = 1
+#+END_SRC
+
+#+BEGIN_SRC cypher
+  MATCH (v:FraudVictim)
+  WITH COUNT(v) AS cnt
+  MATCH (c:Client) WHERE c.knownVictim IS NULL
+  WITH cnt, collect(c) AS clients
+  WITH apoc.coll.randomItems(clients, cnt) AS nonVictims
+  UNWIND nonVictims AS client
+  SET client.victimStatus = -1
+#+END_SRC
+
+At this point we have something like a training set...a few hundred
+clients that we know are either fraud victims (=victimStatus: 1=) or
+NOT fraud victims (=victimStatus: -1=). The rest of the population is
+unknown with a status of =0=.
+
+Let's take a look at our sample of victims:
+
+#+BEGIN_SRC cypher
+  // Find each of our Fraud Victims and look for the pointers
+  // to their earliest and latest transactions
+  MATCH (v:FraudVictim)
+  MATCH (v)-[:FIRST_TX]->(begin)
+  MATCH (v)-[:LAST_TX]->(finish)
+  WITH v,
+    CASE WHEN begin <> finish
+      // We use shortestPath to get just ONE path.
+      THEN length(shortestPath((begin)-[:NEXT*]->(finish)))
+      // The trivial case the client only made 1 transaction
+      ELSE 1
+    END AS numTxs
+  RETURN v.id, numTxs ORDER BY numTxs DESC
+#+END_SRC
+
+We should see a bit of an exponential curve with a long tail. That's
+fine, this is a representation of our overall fraud population we're
+looking to identify. (We can confirm this later.)
+
+How about looking at the activity with Merchants? Chances are our
+cohort didn't interact with ALL our Merchants. Let's do a quick check
+of how many Merchants they interacted with at any time in history.
+
+#+BEGIN_SRC cypher
+  MATCH (v:FraudVictim)-[:PERFORMED]->(tx)-[:TO]->(target:Merchant)
+  WITH target, count(DISTINCT v) AS numClients
+  RETURN target.id AS merchantId, target.name AS merchantName,
+    numClients, target.highRisk AS isHighRisk
+  ORDER BY numClients DESC
+#+END_SRC
+
+Ok, now to take our known fraud victims and exploit the fact we have
+transaction history for all of them.
+
+Our general hypothesis here is fraud victims had their accounts
+compromised during an interaction with a particular merchant, akin to
+a data breach or card skimming attack in real life. If someone
+"shopped" at a merchant (or in PaySim terms, performed a :PAYMENT,
+:CASH_IN, or :CASH_OUT transaction), they have a non-zero chance of
+being consequently victimized as some point in the future. (The only
+completely safe credit card is the one that's not only not used, but
+never issued :-))
+
+Let's form a bipartite graph directly relating our known fraud victims
+to all the merchants the interacted with BEFORE their first time
+having a transaction flagged as fraud. (This is akin to thinking back
+to all the places you used your credit card before you disputed a charge.)
+
+First, to make it easier to reference, let's set a direct relationship
+(or pointer) to our first flagged fraud charge for our fraud
+victims. (NOTE: We focus on :Payment labels due to PaySim blending 1st and
+3rd party fraud.)
+
+#+BEGIN_SRC cypher
+  MATCH (p:Transaction:Payment {fraud:true})<-[:PERFORMED]-(v:FraudVictim)
+    USING INDEX p:Transaction(fraud)
+  // We can order by the global step counter to make it easier to find
+  // the "first" instance
+  WITH v, p ORDER BY p.globalStep
+  WITH v, collect(p) AS payments
+  // We take the head of the sorted collection as our "first" fraud tx
+  WITH v, head(payments) AS firstFraud
+  MERGE (v)-[:FIRST_FRAUD_TX]->(firstFraud)
+#+END_SRC
+
+Easy! Ok, now the fun part. We want to look at all transactions PRIOR
+to that first fraudulent one, find the merchants they may have been
+with (some could have been with Clients or Banks), and use some
+distance function to come up with a weight we can use for PageRank.
+
+In this case we'll make 2 assumptions:
+1. We only care about Merchants because PaySim uses those as 3rd Party
+   Fraud vectors.
+2. We'll use an exponential decay based on how many Transactions
+   occurred before the fraudulent one...i.e. we won't really focus on
+   "time" per se since PaySim is simulating only a 30 day window.
+
+#+BEGIN_SRC cypher
+  // Use our new relationship to get their "first" fraudulent transaction
+  MATCH (v:FraudVictim)-[:FIRST_FRAUD_TX]->(fraud)
+
+  // Now we find ALL paths, backwards in the transaction chain, that
+  // connect us to a Merchant
+  MATCH path=(fraud)<-[:NEXT*]-(previousTx)-[:TO]->(m:Merchant)
+
+  // We can measure the length of the path to determine the distance,
+  // making sure to only count the :NEXT hops
+  WITH v.id AS victim, m.id AS merchant,
+    size([r IN relationships(path) WHERE type(r) = "NEXT"]) AS distance
+
+  // Use an exponential decay to compute a weight: e^((1-distance))
+  RETURN victim, merchant, distance, exp((1.0-toFloat(distance))/10.0) AS weight
+#+END_SRC
+
+This looks good. But how do we want to use the weight? Let's connect
+the victims and the merchants through a new relationship and add the
+weight as a property.
+
+#+BEGIN_SRC cypher
+  MATCH (v:FraudVictim)-[:FIRST_FRAUD_TX]->(fraud)
+
+  // Here we'll cap the traversal to the last 100 transactions to speed up
+  // our demo. (Before we used an unbounded variable path expansion.)
+  MATCH path=(fraud)<-[:NEXT*1..100]-(tx)-[:TO]->(m:Merchant)
+  WITH v, m, tx, size([r IN relationships(path) WHERE type(r) = "NEXT"]) AS distance
+  WITH v, m, tx, distance, exp((1.0-toFloat(distance))/10.0) AS weight
+
+  // Since fraud victims may have done business with the same merchant multiple
+  // times, let's use a property that distinguishes each relationship based on
+  // the original Transaction id
+  MERGE (v)-[r:TRANSACTED_WITH_PRIOR_TO_FRAUD {id: tx.id}]->(m)
+  SET r.weight = weight, r.distance = distance
+#+END_SRC
+
+We've still got one missing piece...finishing our bipartite graph by
+connecting non-cohort Clients to their Merchants! Let's adapt what
+we've just done, but make it more generic. This will be really our
+core application of our fraud model.
+
+#+BEGIN_SRC cypher
+  CALL apoc.periodic.iterate(
+    // We select all our clients to iterate over
+    'MATCH (c:Client) RETURN c',
+    // Now we find their latest transaction and go back up to 100
+    'MATCH (c)-[:LAST_TX]->(latest)
+     MATCH path=(latest)<-[:NEXT*1..100]-(tx)-[:TO]->(m:Merchant)
+     MERGE (c)-[r:TRANSACTED_WITH {id: tx.id}]->(m)',
+     { batchSize: 50 })
+#+END_SRC
+
+NOTE: The above takes about 12 seconds on my machine. Increasing
+batchSize further /may/ or /may not/ make it faster. Have fun.
+
+Now /every/ client have 0 or many relationships to each merchant based
+on if they interacted in their last 100 transactions.
+
+Finally, it's time to make our graph projection! Let's incorporate:
+- Merchants, Clients, and FraudVictims
+- TRANSACTED_WITH and TRANSACTED_WITH_PRIOR_TO_FRAUD
+- Our weights
+
+#+BEGIN_SRC cypher
+  CALL gds.graph.create('fraud',
+      {
+        Client: { label: 'Client' }
+        Merchant: { label: 'Merchant' }
+      },
+      {
+        TRANSACTED_WITH: {
+          orientation: 'UNDIRECTED',
+          properties: {
+            count: {
+              property: '*',
+              defaultValue: 0,
+              aggregation: 'COUNT'
+            }
+          }
+        },
+        TRANSACTED_WITH_MERCHANT: {
+          type: 'TRANSACTED_WITH',
+          orientation: 'NATURAL',
+          properties: {
+            count: {
+              property: '*',
+              defaultValue: 0,
+              aggregation: 'COUNT'
+            }
+          }
+        },
+        TRANSACTED_WITH_CLIENT: {
+          type: 'TRANSACTED_WITH',
+          orientation: 'REVERSE',
+          properties: {
+            count: {
+              property: '*',
+              defaultValue: 0,
+              aggregation: 'COUNT'
+            }
+          }
+        },
+        TRANSACTED_WITH_PRIOR_TO_FRAUD: {
+          orientation: 'NATURAL',
+          properties: {
+            weight: { property: 'weight', defaultValue: 0.0 }
+          }
+        }
+      })
+#+END_SRC
+
+We've got our projection, so now onto the algorithms!!! FINALLY!
+
+First, using our "training set" (if you will), let's use PageRank to
+compute a form of "risk" score we can associate with each Merchant. We
+tell the algorithm to only use parts of the projection related to our
+FraudVictim labels and our Merchants and make sure to use the weighted
+relationships we created previously.
+
+#+BEGIN_SRC cypher
+  CALL gds.pageRank.stream('fraud',
+    {
+      nodeLabels: ['Client', 'Merchant'],
+      relationshipTypes: ['TRANSACTED_WITH_PRIOR_TO_FRAUD'],
+      relationshipWeightProperty: 'weight'
+    }) YIELD nodeId, score
+  WITH gds.util.asNode(nodeId) AS node, score ORDER BY score DESC
+  RETURN node.id, node.highRisk, score
+#+END_SRC
+
+Looks ok for now. The top scorers are our known high-risk merchants!
+
+Now let's mutate the projection, applying these scores to our
+Merchants.
+
+#+BEGIN_SRC cypher
+  CALL gds.pageRank.mutate('fraud',
+    {
+      nodeLabels: ['Client', 'Merchant'],
+      relationshipTypes: ['TRANSACTED_WITH_PRIOR_TO_FRAUD'],
+      relationshipWeightProperty: 'weight',
+      mutateProperty: 'pagerank'
+    })
+#+END_SRC
+
+Great, but how do we leverage our PageRank output? Let's recap:
+
+- We've basically scored Merchants based on their riskiness.
+- We have a training set we've labeled:
+  + =1= :: known victims
+  + =-1= :: known non-victims
+
+We can leverage Label Propagation to allow the graph to take what it
+knows (our existing labels), leverage relationships we've established,
+and algorithmically label the remaining Clients.
+
+#+BEGIN_SRC cypher
+CALL gds.labelPropagation.stream('fraud',
+    {
+    	nodeLabels: ['Client', 'Merchant'],
+        relationshipTypes: ['TRANSACTED_WITH'],
+        nodeWeightProperty: 'pagerank',
+        relationshipWeightProperty: 'weight',
+        seedProperty: 'victimStatus'
+    }
+) YIELD nodeId, communityId
+WITH communityId, gds.util.asNode(nodeId) AS node
+WITH communityId, collect(node.id) AS members
+RETURN communityId, size(members)
+#+END_SRC
+
+* Reset the world
+Only run this if you want to start over :-)
+#+BEGIN_SRC cypher
+  // grand reset
+  MATCH (c:Client)
+  REMOVE c:FraudVictim, c.victim, c.knownVictim;
+
+  MATCH (c:Client)-[r:TRANSACTED_WITH|TRANSACTED_WITH_PRIOR_TO_FRAUD]-()
+  DELETE r;
+
+  MATCH (m:Merchant)
+  REMOVE m.weight, m.pagerank
+#+END_SRC

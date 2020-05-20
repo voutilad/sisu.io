@@ -6,7 +6,7 @@
 * Tangling this file
 Don't forget, it's easy: =C-c-v t=.
 
-Then: =M-x org-publish-project=
+Then: =C-c-e H h=
 
 * Styling and Pizazz
 

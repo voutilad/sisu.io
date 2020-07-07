@@ -3,7 +3,7 @@ title = "Bringing traditional ML to your Neo4j Graph with node2vec"
 author = ["Dave Voutila"]
 description = "Let's take a look at using graph embeddings with traditional ML tools"
 date = 2020-07-09
-lastmod = 2020-07-07T15:57:58-04:00
+lastmod = 2020-07-07T16:34:22-04:00
 tags = ["neo4j", "data-sience"]
 draft = false
 +++
@@ -109,7 +109,7 @@ You should now have a graph with 77 nodes (each with a `Character`
 label) connected to one another via a `APPEARED_WITH` relationship
 containing a `weight` numerical property.
 
-<a id="orgdd2a4b8"></a>
+<a id="org3669d2a"></a>
 
 {{< figure src="/img/lesmis_appearances.svg" caption="Figure 1: Initial overview of our Les Mis network" >}}
 
@@ -175,7 +175,7 @@ the impact to the output of a **_k_-means clustering** algorithm. Let's
 use Neo4j's _node2vec_ algorithm and see how we can reproduce Grover &
 Leskovec's case study in the Les Mis network[^fn:4].
 
-<a id="org4984297"></a>
+<a id="org576d52b"></a>
 
 {{< figure src="/img/node2vec-original.png" caption="Figure 2: Grover and Leskovec's \"complementary visualizations of Les Mis...\" showing homophily (top) and structural equivalence (bottom) where colors represent clusters" >}}
 
@@ -249,7 +249,7 @@ WHERE c1.name IN ['Zephine', 'Dahlia']
 RETURN p
 ```
 
-<a id="org4801542"></a>
+<a id="org75273cc"></a>
 
 {{< figure src="/img/zephy_dahlia_1.svg" caption="Figure 3: Zephine and Dahlia (original)" >}}
 
@@ -267,7 +267,7 @@ UNWIND range(1, r.weight) AS i
 
 Now let's look at Zephone and Dahlia again:
 
-<a id="org190bb20"></a>
+<a id="org6e129c7"></a>
 
 {{< figure src="/img/zephy_dahlia_2.svg" caption="Figure 4: Zephine and Dahlia (now including unweighted edges)" >}}
 
@@ -320,7 +320,7 @@ CALL gds.alpha.node2vec.stream({
 
 What do some of our results look like?
 
-<a id="orgb7a5770"></a>
+<a id="orgfbe5dff"></a>
 
 {{< figure src="/img/example_embeddings.png" caption="Figure 5: Here, have some node embeddings!" >}}
 
@@ -399,6 +399,7 @@ usage:   kmeans.py [-A BOLT URI] [-U USERNAME (default: neo4j)] [-P PASSWORD (de
 supported parameters:
         -R RELATIONSHIP_TYPE (default: 'UNWEIGHTED_APPEARED_WITH'
         -L NODE_LABEL (default: 'Character'
+        -C CLUSTER_PROPERTY (default: 'clusterId')
         -d DIMENSIONS (default: 16)
         -p RETURN PARAMETER (default: 1.0)
         -q IN-OUT PARAMETER (default: 1.0)
@@ -406,6 +407,33 @@ supported parameters:
 ```
 
 Easy, peasy! See the [appendix](#appendix-neo4j-s-python-driver-and-scikit-learn) for details on the Python implementation.
+
+Now do one run for the **homophily** output and one for the **structured
+equivalence** case (adust the bolt, username, and password params as
+needed for your environment).
+
+```sh
+$ python kmeans.py -p 1.0 -q 0.5 -C homophilyCluster
+
+Connecting to uri: bolt://192.168.1.167:7687
+Generating graph embeddings (p=1.0, q=0.5, d=16, label:Character, relType:UNWEIGHTED_APPEARED_WITH)
+...generated 77 embeddings
+Performing K-Means clustering (n_clusters=6, clusterParam=homophilyCluster)
+...clustering completed.
+Updating graph...
+...update complete: {'properties_set': 77}
+```
+
+```sh
+$ python kmeans.py -p 1.0 -q 2.0 -A bolt://192.168.1.167:7687 -C structuredEquivCluster -R UNWEIGHTED_APPEARED_WITH
+Connecting to uri: bolt://192.168.1.167:7687
+Generating graph embeddings (p=1.0, q=2.0, d=16, label:Character, relType:UNWEIGHTED_APPEARED_WITH)
+...generated 77 embeddings
+Performing K-Means clustering (n_clusters=6, clusterParam=structuredEquivCluster)
+...clustering completed.
+Updating graph...
+...update complete: {'properties_set': 77}
+```
 
 
 ## Where can we go from here? {#where-can-we-go-from-here}

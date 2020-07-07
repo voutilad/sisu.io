@@ -1,0 +1,515 @@
+#+TITLE: Bringing traditional ML to your Neo4j Graph with node2vec
+#+DESCRIPTION: Let's take a look at using graph embeddings with traditional ML tools
+#+DATE: 2020-07-09
+#+OPTIONS: toc:2
+#+hugo_auto_set_lastmod: t
+#+hugo_tags: neo4j data-sience
+#+hugo_base_dir: ..
+#+hugo_section: posts
+
+Departing for once from my posts involving financial fraud topics,
+let's take more of a functional look at an upcoming capability in the
+new Neo4j Graph Data Science library (v1.3) called "graph embeddings."
+
+Since most machine learning and artificial intelligence applications
+expect someone to present them just numerical representations of the
+real world, some non-trivial amount of time is spent turning pictures
+of cats on the internet into 1's and 0's. You can do the same with
+your graphs, but there's a catch.
+
+#+BEGIN_QUOTE
+A disclaimer: this post was written using a pre-release of v1.3 of the
+Graph Data Science library and some of the examples here may need
+tuning, especially since the node2vec implementation is still in an
+alpha[fn:1] state.
+#+END_QUOTE
+
+* node2what-now?
+As the name implies, [[https://snap.stanford.edu/node2vec/][node2vec]] creates *node* embeddings for the given
+nodes of a graph, generating a /d/-dimensional feature vector for each
+node where /d/ is a tunable parameter in the algorithm.
+
+Ok...so what's the point?
+
+Given an arbitrary graph, how can you scalably generate feature
+vectors? For small graphs, we could make something pretty trivial by
+hand. But as graphs grow or are have unknown characteristics you'll
+need a general approach that can learn features from the graph and do
+so at scale.
+
+**TKTKTKT INSERT GRAPHIC HERE TKTKTKT**
+
+This is where /node2vec/ comes in. It utilizes a combination of
+feature learning with a random walk to generalize and scale.
+
+The nitty-gritty is beyond the scope of this blog post, so if you're
+of an academic mindset I recommend reading Grover and Leskovec's paper
+[[https://arxiv.org/pdf/1607.00653.pdf][node2vec: Scalable Feature Learnings for Networks]].
+
+
+
+* The Les Misérables Data Set
+Similar to Neo4j's often demo'd [[https://neo4j.com/blog/graph-of-thrones/][Game of Thrones]] data set, let's take
+look at one used by the node2vec authors related to co-appearances in
+the Victor Hugo novel /Les Misérables/.
+
+#+BEGIN_QUOTE
+And just like Game of Thrones, I haven't read Les Misérables. Shhh!
+#+END_QUOTE
+
+** Prerequisites
+Graph a copy of [[https://neo4j.com/download-center][Neo4j 4.1]], ideally a copy of [[https://neo4j.com/download][Neo4j Desktop]] to make it
+easier for yourself if you're not familiar with installing plugins,
+etc. (See the [[https://neo4j.com/developer/neo4j-desktop/][getting started guide]] if you're new to this stuff.)
+
+You'll need the latest supported APOC and Graph Data Science plugins
+as well.
+
+** Loading the Data
+I've transformed a publicly available data set from Donald Knuth's
+/"The Stanford GraphBase: A Platform for Combinatorial
+Computing"/[fn:2] into a JSON representation easily loaded via [[https://neo4j.com/docs/labs/apoc/4.0/][APOC]]'s
+json import procedure.
+
+It doesn't get much easier than this:
+
+#+BEGIN_SRC cypher
+  CALL apoc.import.json('https://www.sisu.io/data/lesmis.json')
+#+END_SRC
+
+You should now have a graph with 77 nodes (each with a =Character=
+label) connected to one another via a =APPEARED_WITH= relationship
+containing a =weight= numerical property.
+
+#+CAPTION: Initial overview of our Les Mis network
+#+NAME: fig:lesmis_appearances.svg
+file:../static/img/lesmis_appearances.svg
+
+#+BEGIN_QUOTE
+While we've loaded it as a directed graph (because all relationships in
+Neo4j must have a direction), our data set is really representing an
+undirected graph.
+#+END_QUOTE
+
+Feel free to explore it a little. One of the interesting things is
+this data set already contains some modularity-based clustering (since
+I got the source data from the [[https://gephi.org][Gephi]] project). We'll use this later to
+compare/contrast our output.
+
+* Using node2vec
+
+Now that we've got our undirected, monopartite[fn:3] graph how do we
+use *node2vec*? Just like other GDS algorithms, we define our /graph
+projection/ and set some algorithm specific parameters.
+
+In the case of *node2vec*, the parameters we'll tune are:
+
+- =embeddingSize= :: /(integer)/ The number of dimensions of the resulting feature
+  vector
+
+- =returnFactor= :: /(double)/ Likelyhood of returning to the prior node in the
+  random walk (referred to as /p/ in the node2vec paper)
+
+- =inOutFactor= :: /(double)/ Bias parameter for how likely the random walk will
+  explore distant nodes vs. closer nodes in the graph (reffered to as
+  /q/ in the node2vec paper)
+
+#+BEGIN_QUOTE
+Note: All of the above parameters take non-negative values.
+#+END_QUOTE
+
+Using parameter placeholders, here's what a call to node2vec looks
+like using an anonymous, native graph projection:
+
+#+BEGIN_SRC cypher
+  CALL gds.alpha.node2vec.stream({
+    nodeProjection: 'Character',
+    relationshipProjection: {
+    EDGE: {
+      type: 'APPEARED_WITH',
+      orientation: 'UNDIRECTED'
+    },
+    embeddingSize: $d,
+    returnFactor: $p,
+    inOutFactor: $q
+  }) YIELD nodeId, embedding
+#+END_SRC
+
+* Reproducing Grover & Leskovec's Findings
+In their paper, the authors leverage the Les Mis' data set to
+illustrate the tunable return (/p/) and in-out (/q/) parameters and
+how they influence the resulting feature vectors and, consequently,
+the impact to the output of a */k/-means clustering* algorithm. Let's
+use Neo4j's /node2vec/ algorithm and see how we can reproduce Grover &
+Leskovec's case study in the Les Mis network[fn:4].
+
+#+CAPTION: Grover and Leskovec's "complementary visualizations of Les Mis..." showing homophily (top) and structural equivalence (bottom) where colors represent clusters
+#+NAME: fig:provided-example-clusters
+file:../static/img/node2vec-original.png
+
+** What did they demonstrate?
+The author's used the Les Mis network to show how node2vec can
+discover embeddings that obey the concepts of /homophily/ and
+/structural equivalence/. What does that mean?
+
+- *homophily* :: One definition outside math is "the tendency of
+  individuals to associate with others of the same kind"[fn:5]. This
+  means favoring nodes in a given node's neighborhood. (See the top
+  part of /fig 2/.)
+
+- *structural equivalence* :: Two nodes are /structurally equivalent/
+  if they have the same relationships (or lack thereof) to all other
+  nodes[fn:6]. (See the bottom part of /fig 2/.)
+
+Let's see if we can use the parameters they mentioned and a /k/-means
+implementation to recreate something similar to their output in
+/Figure 2./
+
+** Our Methodology
+Since Grover & leskovec don't mention exactly how they arrived at
+their Les Mis output, we're going to try using the following
+methodology:
+
+1. *Populate Neo4j* with the Co-appearance graph -- We've already done this part in [[Loading the Data]] above!
+2. *Refactor the graph* to accomodate unweighted edges -- The current
+   alpha node2vec implementation doesn't support weights yet, but we
+   can achieve the same result through a structural change.
+3. *Generate node embeddings*.
+4. Run the embeddings through [[https://scikit-learn.org/stable/modules/clustering.html#k-means][scikitlearn's *KMeans algorithm*]].
+5. *Update the nodes* their cluster assignments, writing back to Neo4j.
+6. *Visualize the results* with [[https://neo4j.com/bloom/][Neo4j Bloom]].
+
+Now, let's get to it!
+
+* The Demonstration
+
+We've already got the data loaded, so let's skip to step 2.
+
+** Refactoring the Graph
+Since the *node2vec* implementation doesn't support weighted edges
+(yet!), we can achieve the same effect with a simple
+refactor. Ultimately, we want the number of co-appearances to be the
+weight of the edge between two characters and that's what the =weight=
+relationship property currently represents.
+
+Since the weight needs to influece the /search bias/ in the node2vec
+algorithm, we want to increase the probability of a visit to a
+neighboring node that has a higher weight. How can we do that? *Adding
+multiple edges between nodes!*
+
+Let's take an example:
+
+#+BEGIN_SRC cypher
+  // Let's look at 2 characters and how they're related
+  MATCH p=(c1:Character)-[]-(c2:Character)
+  WHERE c1.name IN ['Zephine', 'Dahlia']
+    AND c2.name IN ['Zephine', 'Dahlia']
+  RETURN p
+#+END_SRC
+
+#+CAPTION: Zephine and Dahlia (original)
+#+NAME: fig:zephy_dahlia_1.svg
+file:../static/img/zephy_dahlia_1.svg
+
+In this case, their =APPEARED_WITH= relationship has a weight of
+=4.0=. (Not visible in the figure, so trust me!)
+
+What we really want are *4 edges* between them, so we can do a little
+refactoring of our graph:
+
+#+BEGIN_SRC cypher
+  MATCH (c1:Character)-[r:APPEARED_WITH]->(c2:Character)
+  UNWIND range(1, r.weight) AS i
+    MERGE (c1)-[:UNWEIGHTED_APPEARED_WITH {idx:i}]->(c2)
+#+END_SRC
+
+Now let's look at Zephone and Dahlia again:
+
+#+CAPTION: Zephine and Dahlia (now including unweighted edges)
+#+NAME: fig:zephy_dahlia_2.svg
+file:../static/img/zephy_dahlia_2.svg
+
+We've now got 4 distinct =UNWEIGHTED_APPEARED_WITH= edges between
+them. (Yes, I'm pretty verbose with my naming!)
+
+** Generating the Embeddings
+This part is made super simple by the GDS library, as we saw above in
+the [[Using node2vec][using node2vec introduction]]. We just need to make sure to update
+the projection and set our parameters.
+
+To start, for the /homophily/ example we set =p = 1.0, q = 0.5, d =
+16= per Grover & Leskovec's case study:
+
+#+BEGIN_SRC cypher
+  CALL gds.alpha.node2vec.stream({
+    nodeProjection: 'Character',
+    relationshipProjection: {
+      EDGE: {
+        type: 'UNWEIGHTED_APPEARED_WITH',
+        orientation: 'UNDIRECTED'
+      }
+    },
+    returnFactor: 1.0, // parameter 'p'
+    inOutFactor: 0.5,  // parameter 'q'
+    embeddingSize: 16  // parameter 'd'
+  })
+#+END_SRC
+
+For our /structured equivalence/ example, we set =p = 1.0, q = 2.0, d
+= 16= (in effect, only =q= changes):
+
+#+BEGIN_SRC cypher
+  CALL gds.alpha.node2vec.stream({
+    nodeProjection: 'Character',
+    relationshipProjection: {
+      EDGE: {
+        type: 'UNWEIGHTED_APPEARED_WITH',
+        orientation: 'UNDIRECTED'
+      }
+    },
+    returnFactor: 1.0, // parameter 'p'
+    inOutFactor: 2.0,  // parameter 'q'
+    embeddingSize: 16  // parameter 'd'
+  })
+
+#+END_SRC
+
+What do some of our results look like?
+
+#+CAPTION: Here, have some node embeddings!
+#+NAME: fig:example_embeddings.png
+file:../static/img/example_embeddings.png
+
+You'll notice your results differ from mine, regardless of which of
+the above examples you run. (If not...I'd be a bit surprised!) Given
+the random nature of the walk, the specific values themselves aren't
+interesting or have any reasonable representation. You should see, for
+each node, a */16/-dimensional feature vector* since we set our
+dimensions parameter =d = 16=.
+
+The idea here is the features as a whole describe the nodes with
+respect to each other. /So don't worry if you can't make heads or
+tails of the numbers!/
+
+** Clustering our Nodes with /K/-Means
+This is where things get a bit fun as you should now be wondering "how
+do I get the data out of Neo4j and into SciKit Learn?!"
+
+We're going to use the [[https://neo4j.com/docs/api/python-driver/current/][Neo4j Python Driver]] to orchestrate running our
+GDS algorithms and feeding the feature vectors to a /k/-means
+algorithm.
+
+*** Bootstrapping your Python3 environment
+In the interest of time, I've done the hard part for you. You can =git
+clone= [[https://github.com/neo4j-field/les-miserables][my les-miserables]] project locally and do the following to get going.
+
+**** Create your Python3 Virtual Environment
+After cloning or downloading the project, create a new Python virtual
+environment (this assumes a unix-like shell...adapt for Windows):
+
+#+BEGIN_SRC sh
+$ python3 -venv .venv
+#+END_SRC
+
+**** Activate the environment
+#+BEGIN_SRC sh
+$ . .venv/bin/activate
+#+END_SRC
+
+**** Install the dependencies using PIP
+#+BEGIN_SRC sh
+$ pip install -r requirements.txt
+#+END_SRC
+
+You should now have =scikit-learn= and =neo4j= packages
+available. Feel free to test by opening a Python interpreter and
+trying to =import neo4j=, etc.
+
+*** Using my provided Python script
+I've provided an implementation of the Python Neo4j driver as well as
+the SciKit Learn KMeans algorithm so we won't go into details on
+eithers inner workings here. The script (=kmeans.py=)[fn:7] takes a variety
+of command line arguments allowing us to tune the parameters we
+want.
+
+You can look at the usage details using the =-h= flag:
+
+#+BEGIN_SRC sh
+  (lesmis)~/src/neo-lesmis$ python kmeans.py -h
+  usage:   kmeans.py [-A BOLT URI] [-U USERNAME (default: neo4j)] [-P PASSWORD (default: password)]
+  supported parameters:
+          -R RELATIONSHIP_TYPE (default: 'UNWEIGHTED_APPEARED_WITH'
+          -L NODE_LABEL (default: 'Character'
+          -C CLUSTER_PROPERTY (default: 'clusterId')
+          -d DIMENSIONS (default: 16)
+          -p RETURN PARAMETER (default: 1.0)
+          -q IN-OUT PARAMETER (default: 1.0)
+          -k K-MEANS NUM_CLUSTERS (default: 6)
+#+END_SRC
+
+Easy, peasy! See the [[Appendix: Neo4j's Python Driver and SciKit Learn][appendix]] for details on the Python implementation.
+
+Now do one run for the *homophily* output and one for the *structured
+equivalence* case (adust the bolt, username, and password params as
+needed for your environment).
+
+#+BEGIN_SRC sh
+  $ python kmeans.py -p 1.0 -q 0.5 -C homophilyCluster
+
+  Connecting to uri: bolt://192.168.1.167:7687
+  Generating graph embeddings (p=1.0, q=0.5, d=16, label:Character, relType:UNWEIGHTED_APPEARED_WITH)
+  ...generated 77 embeddings
+  Performing K-Means clustering (n_clusters=6, clusterParam=homophilyCluster)
+  ...clustering completed.
+  Updating graph...
+  ...update complete: {'properties_set': 77}
+#+END_SRC
+
+#+BEGIN_SRC sh
+  $ python kmeans.py -p 1.0 -q 2.0 -A bolt://192.168.1.167:7687 -C structuredEquivCluster -R UNWEIGHTED_APPEARED_WITH
+  Connecting to uri: bolt://192.168.1.167:7687
+  Generating graph embeddings (p=1.0, q=2.0, d=16, label:Character, relType:UNWEIGHTED_APPEARED_WITH)
+  ...generated 77 embeddings
+  Performing K-Means clustering (n_clusters=6, clusterParam=structuredEquivCluster)
+  ...clustering completed.
+  Updating graph...
+  ...update complete: {'properties_set': 77}
+#+END_SRC
+
+
+* Where can we go from here?
+One area worth exploring is how to better integrate Neo4j into your
+existing ML workflows and pipelines. In the above example, we just
+used the Python driver and anonymous projections to integrate
+something pretty trivial...but you probably need to handle much larger
+data sets in your use cases.
+
+One possibility is leveraging Neo4j's /Apache Kafka/ integration in
+the *neo4j-streams* plugin. Neo4j's Ljubica Lazarevic provides an
+overview in her January 2019 post: /[[https://www.freecodecamp.org/news/how-to-embrace-event-driven-graph-analytics-using-neo4j-and-apache-kafka-474c9f405e06/][How to embrace event-driven graph
+analytics using Neo4j and Apache Kafka]]/
+
+* Appendix: Neo4j's Python Driver and SciKit Learn
+Here are some code snippets that help show what's going on under the
+covers in the =kmeans.py= script. A lot of the code is purely
+administrative (dealing with command line args, etc.), but there are
+two key functions.
+
+** Extracting the Embeddings
+How do you run the GDS node2vec procedure and get the embedding
+vectors? This is one way to do it, but the key part is using
+=session.run()= and adding in the query parameters.
+
+#+BEGIN_SRC python
+  def extract_embeddings(driver, label=DEFAULT_LABEL, relType=DEFAULT_REL,
+                         p=1.0, q=1.0, d=16):
+      """
+      Call the GDS neo2vec routine using the given driver and provided params.
+      """
+      print("Generating graph embeddings (p={}, q={}, d={}, label:{}, relType:{})"
+            .format(p, q, d, label, relType))
+      embeddings = []
+      with driver.session() as session:
+          results = session.run(NODE2VEC_CYPHER, L=label, R=relType,
+                                p=float(p), q=float(q), d=int(d))
+          for result in results:
+              embeddings.append(result)
+      print("...generated {} embeddings".format(len(embeddings)))
+      return embeddings
+#+END_SRC
+
+Where =NODE2VEC_CYPHER= is our Cypher template:
+
+#+BEGIN_SRC python
+  NODE2VEC_CYPHER = """
+  CALL gds.alpha.node2vec.stream({
+    nodeProjection: $L,
+    relationshipProjection: {
+      EDGE: {
+        type: $R,
+        orientation: 'UNDIRECTED'
+      }
+    },
+    embeddingSize: $d,
+    returnFactor: $p,
+    inOutFactor: $q
+  }) YIELD nodeId, embedding
+  """
+#+END_SRC
+
+** Clustering with SciKit Learn
+Our above function returns a List of Python dicts, each with a
+=nodeId= and =embedding= key where the =embedding= is the feature
+vector (as a Python List of numbers).
+
+To use /SciKit Learn/, we need to generate a dataframe using /NumPy/,
+specifically the /array()/ function. Using a list comphrension, it's
+easy to extract out just the feature vectors from the
+=extract_embedding= output:
+
+#+BEGIN_SRC python
+  def kmeans(embeddings, k=NUM_CLUSTERS, clusterParam="clusterId"):
+      """
+      Given a list of dicts like {"nodeId" 1, "embedding": [1.0, 0.1, ...]},
+      generate a list of dicts like {"nodeId": 1, "valueMap": {"clusterId": 2}}
+      """
+      print("Performing K-Means clustering (n_clusters={}, clusterParam={})"
+            .format(NUM_CLUSTERS, clusterParam))
+      X = np.array([e["embedding"] for e in embeddings])
+      kmeans = KMeans(n_clusters=int(k)).fit(X)
+      results = []
+      for idx, cluster in enumerate(kmeans.predict(X)):
+          results.append({ "nodeId": embeddings[idx]["nodeId"],
+                           "valueMap": { clusterParam: int(cluster) }})
+      print("...clustering completed.")
+      return results
+#+END_SRC
+
+The last part, after using =KMeans=, is constructing a useful output
+for populating another Cypher query template. My approach creates a
+List of dicts that like:
+
+#+BEGIN_SRC python
+  [
+      { "nodeId": 123, "valueMap": { homophilyCluster: 3 } },
+      { "nodeId": 234, "valueMap": { homophilyCluster: 5 } },
+      ...
+  ]
+#+END_SRC
+
+Which drives the super simple, 3-line bulk-update Cypher template:
+
+#+BEGIN_SRC python
+  UPDATE_CYPHER = """
+  UNWIND $updates AS updateMap
+      MATCH (n) WHERE id(n) = updateMap.nodeId
+      SET n += updateMap.valueMap
+  """
+#+END_SRC
+
+Using Cypher's =UNWIND=, we iterate over all the dicts. The =MATCH=
+finds a node using the internal node id (using =id()=) and then
+updates properties on the matched node using the =+== operator and the
+=valueMap= dict.
+
+* Footnotes
+
+[fn:1] What's /alpha/ state mean? See the GDS documentation on the
+different algorithm support tiers:
+https://neo4j.com/docs/graph-data-science/current/algorithms/
+
+[fn:2]
+D. E. Knuth. (1993). The Stanford GraphBase: A Platform for
+Combinatorial Computing, Addison-Wesley, Reading, MA
+
+[fn:3] Monopartite graphs are graphs where all nodes share the same
+label or type...or lack labels.
+
+[fn:4] See section /4.1 Case Study: Les Misérables network/ in the
+node2vec paper
+
+[fn:5] See https://en.wiktionary.org/wiki/homophily
+
+[fn:6] See http://faculty.ucr.edu/~hanneman/nettext/C12_Equivalence.html#structural
+
+[fn:7] Source code is also here: https://github.com/neo4j-field/les-miserables/blob/master/kmeans.py

@@ -3,7 +3,7 @@ title = "Bringing traditional ML to your Neo4j Graph with node2vec"
 author = ["Dave Voutila"]
 description = "Let's take a look at using graph embeddings with traditional ML tools"
 date = 2020-07-09
-lastmod = 2020-07-07T16:34:22-04:00
+lastmod = 2020-07-08T12:47:42-04:00
 tags = ["neo4j", "data-sience"]
 draft = false
 +++
@@ -13,25 +13,20 @@ draft = false
 
 <div class="heading">Table of Contents</div>
 
-- [node2what-now?](#node2what-now)
+- [node2what-now? 🤔](#node2what-now)
 - [The Les Misérables Data Set](#the-les-misérables-data-set)
-    - [Prerequisites](#prerequisites)
-    - [Loading the Data](#loading-the-data)
 - [Using node2vec](#using-node2vec)
 - [Reproducing Grover & Leskovec's Findings](#reproducing-grover-and-leskovec-s-findings)
-    - [What did they demonstrate?](#what-did-they-demonstrate)
-    - [Our Methodology](#our-methodology)
 - [The Demonstration](#the-demonstration)
-    - [Refactoring the Graph](#refactoring-the-graph)
-    - [Generating the Embeddings](#generating-the-embeddings)
-    - [Clustering our Nodes with _K_-Means](#clustering-our-nodes-with-k-means)
 - [Where can we go from here?](#where-can-we-go-from-here)
 - [Appendix: Neo4j's Python Driver and SciKit Learn](#appendix-neo4j-s-python-driver-and-scikit-learn)
-    - [Extracting the Embeddings](#extracting-the-embeddings)
-    - [Clustering with SciKit Learn](#clustering-with-scikit-learn)
 
 </div>
 <!--endtoc-->
+
+<a id="org581bc96"></a>
+
+{{< figure src="/img/node2vec-handsketch.png" caption="Figure 1: Graph Embeddings are Magical!" >}}
 
 Departing for once from my posts involving financial fraud topics,
 let's take more of a functional look at an upcoming capability in the
@@ -43,17 +38,21 @@ real world, some non-trivial amount of time is spent turning pictures
 of cats on the internet into 1's and 0's. You can do the same with
 your graphs, but there's a catch.
 
-> A disclaimer: this post was written using a pre-release of v1.3 of the
-> Graph Data Science library and some of the examples here may need
+> A disclaimer: this post was written using a pre-release of v1.3 of
+> the Graph Data Science library and some of the examples here may need
 > tuning, especially since the node2vec implementation is still in an
 > alpha[^fn:1] state.
 
 
-## node2what-now? {#node2what-now}
+## node2what-now? 🤔 {#node2what-now}
 
 As the name implies, [node2vec](https://snap.stanford.edu/node2vec/) creates **node** embeddings for the given
 nodes of a graph, generating a _d_-dimensional feature vector for each
 node where _d_ is a tunable parameter in the algorithm.
+
+<a id="orga41402b"></a>
+
+{{< figure src="/img/node2vec-walk.png" caption="Figure 2: A biased random walk with node2vec (image from the paper)" >}}
 
 Ok...so what's the point?
 
@@ -62,8 +61,6 @@ vectors? For small graphs, we could make something pretty trivial by
 hand. But as graphs grow or are have unknown characteristics you'll
 need a general approach that can learn features from the graph and do
 so at scale.
-
-****TKTKTKT INSERT GRAPHIC HERE TKTKTKT****
 
 This is where _node2vec_ comes in. It utilizes a combination of
 feature learning with a random walk to generalize and scale.
@@ -109,9 +106,9 @@ You should now have a graph with 77 nodes (each with a `Character`
 label) connected to one another via a `APPEARED_WITH` relationship
 containing a `weight` numerical property.
 
-<a id="org3669d2a"></a>
+<a id="orgcc09f58"></a>
 
-{{< figure src="/img/lesmis_appearances.svg" caption="Figure 1: Initial overview of our Les Mis network" >}}
+{{< figure src="/img/lesmis_appearances.svg" caption="Figure 3: Initial overview of our Les Mis network" >}}
 
 > While we've loaded it as a directed graph (because all relationships in
 > Neo4j must have a direction), our data set is really representing an
@@ -146,7 +143,11 @@ In the case of **node2vec**, the parameters we'll tune are:
     explore distant nodes vs. closer nodes in the graph (reffered to as
     _q_ in the node2vec paper)
 
-> Note: All of the above parameters take non-negative values.
+
+`walkLength`
+: _(integer)_ The length of each random walk
+
+> Note: All of the above parameters take non-negative values. 😉
 
 Using parameter placeholders, here's what a call to node2vec looks
 like using an anonymous, native graph projection:
@@ -161,7 +162,8 @@ CALL gds.alpha.node2vec.stream({
   },
   embeddingSize: $d,
   returnFactor: $p,
-  inOutFactor: $q
+  inOutFactor: $q,
+  walkLength: $w
 }) YIELD nodeId, embedding
 ```
 
@@ -175,9 +177,9 @@ the impact to the output of a **_k_-means clustering** algorithm. Let's
 use Neo4j's _node2vec_ algorithm and see how we can reproduce Grover &
 Leskovec's case study in the Les Mis network[^fn:4].
 
-<a id="org576d52b"></a>
+<a id="org72d3209"></a>
 
-{{< figure src="/img/node2vec-original.png" caption="Figure 2: Grover and Leskovec's \"complementary visualizations of Les Mis...\" showing homophily (top) and structural equivalence (bottom) where colors represent clusters" >}}
+{{< figure src="/img/node2vec-original.png" caption="Figure 4: Grover and Leskovec's \"complementary visualizations of Les Mis...\" showing homophily (top) and structural equivalence (bottom) where colors represent clusters" >}}
 
 
 ### What did they demonstrate? {#what-did-they-demonstrate}
@@ -190,13 +192,23 @@ _structural equivalence_. What does that mean?
 : One definition outside math is "the tendency of
     individuals to associate with others of the same kind"[^fn:5]. This
     means favoring nodes in a given node's neighborhood. (See the top
-    part of _fig 2_.)
+    part of _fig 4_.)
 
 
 **structural equivalence**
 : Two nodes are _structurally equivalent_
     if they have the same relationships (or lack thereof) to all other
-    nodes[^fn:6]. (See the bottom part of _fig 2_.)
+    nodes[^fn:6]. (See the bottom part of _fig 4_.)
+
+In terms of Les Mis, **homophily** can be thought of as clusters of
+Characters that frequently appear with one another. Basically the
+traditional idea of "communities."
+
+For **structured equivalence**, the example the authors provide is the
+concept of "bridge characters" that span sub-plots in the Les Mis
+storyline. These characters might not be part of traditional
+communities, but act as ways to connect disparate communities. (You
+might recall my
 
 Let's see if we can use the parameters they mentioned and a _k_-means
 implementation to recreate something similar to their output in
@@ -249,9 +261,9 @@ WHERE c1.name IN ['Zephine', 'Dahlia']
 RETURN p
 ```
 
-<a id="org75273cc"></a>
+<a id="org5ef6012"></a>
 
-{{< figure src="/img/zephy_dahlia_1.svg" caption="Figure 3: Zephine and Dahlia (original)" >}}
+{{< figure src="/img/zephy_dahlia_1.svg" caption="Figure 5: Zephine and Dahlia (original)" >}}
 
 In this case, their `APPEARED_WITH` relationship has a weight of
 `4.0`. (Not visible in the figure, so trust me!)
@@ -267,9 +279,9 @@ UNWIND range(1, r.weight) AS i
 
 Now let's look at Zephone and Dahlia again:
 
-<a id="org6e129c7"></a>
+<a id="orgd0705e7"></a>
 
-{{< figure src="/img/zephy_dahlia_2.svg" caption="Figure 4: Zephine and Dahlia (now including unweighted edges)" >}}
+{{< figure src="/img/zephy_dahlia_2.svg" caption="Figure 6: Zephine and Dahlia (now including unweighted edges)" >}}
 
 We've now got 4 distinct `UNWEIGHTED_APPEARED_WITH` edges between
 them. (Yes, I'm pretty verbose with my naming!)
@@ -282,7 +294,7 @@ the [using node2vec introduction](#using-node2vec). We just need to make sure to
 the projection and set our parameters.
 
 To start, for the _homophily_ example we set `p = 1.0, q = 0.5, d =
-16` per Grover & Leskovec's case study:
+16` per Grover & Leskovec's case study.
 
 ```cypher
 CALL gds.alpha.node2vec.stream({
@@ -299,8 +311,8 @@ CALL gds.alpha.node2vec.stream({
 })
 ```
 
-For our _structured equivalence_ example, we set `p = 1.0, q = 2.0, d
-= 16` (in effect, only `q` changes):
+For our _structured equivalence_ example, the authors set `p = 1.0, q
+= 2.0, d = 16` (in effect, only `q` changes):
 
 ```cypher
 CALL gds.alpha.node2vec.stream({
@@ -318,11 +330,12 @@ CALL gds.alpha.node2vec.stream({
 
 ```
 
-What do some of our results look like?
+What do some of the some of our embeddings results look like? Let's
+take a look in Neo4j Browser:
 
-<a id="orgfbe5dff"></a>
+<a id="orgd23be0d"></a>
 
-{{< figure src="/img/example_embeddings.png" caption="Figure 5: Here, have some node embeddings!" >}}
+{{< figure src="/img/example_embeddings.png" caption="Figure 7: Here, have some node embeddings!" >}}
 
 You'll notice your results differ from mine, regardless of which of
 the above examples you run. (If not...I'd be a bit surprised!) Given
@@ -394,46 +407,196 @@ want.
 You can look at the usage details using the `-h` flag:
 
 ```sh
-(lesmis)~/src/neo-lesmis$ python kmeans.py -h
-usage:   kmeans.py [-A BOLT URI] [-U USERNAME (default: neo4j)] [-P PASSWORD (default: password)]
+$ python kmeans.py -h
+usage:   kmeans.py [-A BOLT URI default: bolt://localhost:7687] [-U USERNAME (default: neo4j)] [-P PASSWORD (default: password)]
 supported parameters:
         -R RELATIONSHIP_TYPE (default: 'UNWEIGHTED_APPEARED_WITH'
         -L NODE_LABEL (default: 'Character'
-        -C CLUSTER_PROPERTY (default: 'clusterId')
+        -C CLUSTER_PROPERTY (default: 'clusterId'
         -d DIMENSIONS (default: 16)
         -p RETURN PARAMETER (default: 1.0)
         -q IN-OUT PARAMETER (default: 1.0)
         -k K-MEANS NUM_CLUSTERS (default: 6)
+        -l WALK_LENGTH (default: 80)
 ```
 
-Easy, peasy! See the [appendix](#appendix-neo4j-s-python-driver-and-scikit-learn) for details on the Python implementation.
+Easy, peasy! (See the [appendix](#appendix-neo4j-s-python-driver-and-scikit-learn) for details on the Python
+implementation.)
 
-Now do one run for the **homophily** output and one for the **structured
+The paper mentions what to set `p` and `q` to, but what about the
+number of clusters? If you count the distinct colors in their visual,
+we can see they use the following:
+
+-   **six** clusters for the **homophily** demonstration
+-   **three** clusters for the **structural equivalence** demonstration
+
+So we'll set `k` accordingly.
+
+Do one run for the **homophily** output and one for the **structured
 equivalence** case (adust the bolt, username, and password params as
-needed for your environment).
+needed for your environment) using our parameters for `p`, `q`, and
+`k`:
 
 ```sh
-$ python kmeans.py -p 1.0 -q 0.5 -C homophilyCluster
-
-Connecting to uri: bolt://192.168.1.167:7687
-Generating graph embeddings (p=1.0, q=0.5, d=16, label:Character, relType:UNWEIGHTED_APPEARED_WITH)
+$ python kmeans.py -p 1.0 -q 0.5 -k 6 -C homophilyCluster
+Connecting to uri: bolt://localhost:7687
+Generating graph embeddings (p=1.0, q=0.5, d=16, l=80, label=Character, relType=UNWEIGHTED_APPEARED_WITH)
 ...generated 77 embeddings
-Performing K-Means clustering (n_clusters=6, clusterParam=homophilyCluster)
+Performing K-Means clustering (k=6, clusterProp='homophilyCluster')
 ...clustering completed.
 Updating graph...
 ...update complete: {'properties_set': 77}
 ```
 
+And another run changing `q = 2.0` to bias towards structured
+equivalence and `k = 3`:
+
 ```sh
-$ python kmeans.py -p 1.0 -q 2.0 -A bolt://192.168.1.167:7687 -C structuredEquivCluster -R UNWEIGHTED_APPEARED_WITH
+$ python kmeans.py -p 1.0 -q 2.0 -k 3 -C structuredEquivCluster
 Connecting to uri: bolt://192.168.1.167:7687
-Generating graph embeddings (p=1.0, q=2.0, d=16, label:Character, relType:UNWEIGHTED_APPEARED_WITH)
+Generating graph embeddings (p=1.0, q=0.5, d=16, l=80, label=Character, relType=UNWEIGHTED_APPEARED_WITH)
 ...generated 77 embeddings
-Performing K-Means clustering (n_clusters=6, clusterParam=structuredEquivCluster)
+Performing K-Means clustering (k=6, clusterProp='structuredEquivCluster')
 ...clustering completed.
 Updating graph...
 ...update complete: {'properties_set': 77}
 ```
+
+> ⚠ **HEADS UP!** Make sure you use the same cluster output properties (`-C`
+> settings) so they line up with the Bloom perspective I provide!
+
+Nice...but how should we visualize the output?
+
+
+### Visualizing with Neo4j Bloom {#visualizing-with-neo4j-bloom}
+
+If you took my advice and used Neo4j Desktop, you'll have a copy of
+Neo4j Bloom available for free. If not, you're on your own here and
+you'll have to just follow along. (Sorry...not sorry.)
+
+
+#### Configuring our Perspective {#configuring-our-perspective}
+
+Bloom relies on "perspectives" to tailor the visual experience of the
+graph. I've done the work for you (you're welcome!) and you can
+download the json file [here](https://raw.githubusercontent.com/neo4j-field/les-miserables/master/LesMis-perspective.json) or find `LesMis-perspective.json` in the
+GitHub project you cloned earlier.
+
+<a id="org3afae3d"></a>
+
+{{< figure src="/img/bloom-perspective-import.png" caption="Figure 8: Click the Import button...it's pretty easy!" >}}
+
+Follow the [documentation](https://neo4j.com/docs/bloom-user-guide/current/bloom-perspectives/#%5Fcomponents%5Fof%5Fa%5Fperspective) on installing/importing a perspective if you
+need help.
+
+
+#### Visualize the graph {#visualize-the-graph}
+
+Let's pull back a view of all the Characters and use the original
+`APPEARED_WITH` relationship type to connect them.
+
+<a id="orgea6d435"></a>
+
+{{< figure src="/img/bloom-lesmis-query.png" caption="Figure 9: Query for Characters that have a APPEARED\_WITH relationship" >}}
+
+You should get something looking like the following:
+
+<a id="org6b8a499"></a>
+
+{{< figure src="/img/lesmis-network.png" caption="Figure 10: The LesMis Network" >}}
+
+There aren't any colorful clusters and things look pretty messy to me!
+Let's toggle the conditional styling to show the output of our
+clustering.
+
+Using the Bloom node style pop-up menus, you can toggle the
+perspective's pre-set rule-based styles:
+
+<a id="org6f9bbed"></a>
+
+{{< figure src="/img/lesmis-homophily-setting.png" caption="Figure 11: Toggling conditional styling in Bloom" >}}
+
+You should now have a much more colorful graph to look at and let's
+dig into what we're seeing.
+
+
+### Our Homophily Results {#our-homophily-results}
+
+What should you be seeing at this point? Since we generated embeddings
+that leaned towards expressing homophily, we should see some obvious
+communities assigned distinct colors based on the _k_-means clustering
+output.
+
+<a id="org543de68"></a>
+
+{{< figure src="/img/lesmis-homophily.png" caption="Figure 12: Our homophily results: some nice little clusters!" >}}
+
+Not bad! Looks similar to the top part of our [screenshot](#reproducing-grover-and-leskovec-s-findings) from the
+node2vec paper.
+
+How about the structural equivalence results?
+
+
+### Our Stuctural Equivalence Results {#our-stuctural-equivalence-results}
+
+Oh...oh no. This looks nothing like what is in the node2vec paper!
+
+<a id="orgbdd376b"></a>
+
+{{< figure src="/img/lesmis-not-structured.png" caption="Figure 13: Structural Equivalance results that are...less than ideal!!" >}}
+
+What went wrong?! We expected to see something that doesn't look like
+typical communities and instead showing the idea of "bridge
+characters" (recall from [our previous definitions](#what-did-they-demonstrate) of structural
+equivalence).
+
+
+#### Remember our walk length parameter? {#remember-our-walk-length-parameter}
+
+Earlier I mentioned that the Les Mis network has only 77 nodes. It's
+extremely small by any means. Can you remember what the current
+default _walk length_ parameter is for the node2vec implementation?
+
+> Here's a hint: it defaults to `80` 😉
+
+That's fine for our homophily example as the idea was to account for
+global structure of the graph and build communities. But for finding
+"bridge characters", we really care about _local_ structure. (A bridge
+character bridges close-by clusters and sits between them so should
+have little to no relation to a "far away" cluster.)
+
+
+#### Let's re-run with a new walk length {#let-s-re-run-with-a-new-walk-length}
+
+So what should we use? Well, I did some testing, and found that `l =
+7` is a pretty good setting. It's "local enough" to capture bridging
+structure without biasing towards global clusters.
+
+Using the script, add the `-l` command line argument like so:
+
+```sh
+$ python kmeans.py -p 1.0 -q 2.0 -k 3 -C structuredEquivCluster -R UNWEIGHTED_APPEARED_WITH -l 7
+```
+
+Here's what it looks like now:
+
+<a id="orgc77a16d"></a>
+
+{{< figure src="/img/lesmis-structured.png" caption="Figure 14: Structural Equivalance, for real this time." >}}
+
+That's much, much more like the original findings from the paper!
+
+If you count, we get our expected 3 different colors (since in this
+case we set `k = 3`) and if we look at the **blue** nodes they tend to
+connect the reds and purple-ish colored nodes. It's not a perfect
+reproduction of the paper's image, but keep in mind the authors never
+shared their exact parameters!
+
+> Note: since we're using such a small network in these examples, you
+> might have some volatility in your results using a short walk
+> length. That's ok! Remember it's a _random_ walk. In practice you'd
+> most likely use a much larger (i.e. well more than 77 nodes) graph and
+> locality would be more definable.
 
 
 ## Where can we go from here? {#where-can-we-go-from-here}
@@ -466,16 +629,16 @@ vectors? This is one way to do it, but the key part is using
 
 ```python
 def extract_embeddings(driver, label=DEFAULT_LABEL, relType=DEFAULT_REL,
-                       p=1.0, q=1.0, d=16):
+                       p=DEFAULT_P, q=DEFAULT_Q, d=DEFAULT_D, l=DEFAULT_WALK):
     """
     Call the GDS neo2vec routine using the given driver and provided params.
     """
-    print("Generating graph embeddings (p={}, q={}, d={}, label:{}, relType:{})"
-          .format(p, q, d, label, relType))
+    print("Generating graph embeddings (p={}, q={}, d={}, l={}, label={}, relType={})"
+          .format(p, q, d, l, label, relType))
     embeddings = []
     with driver.session() as session:
         results = session.run(NODE2VEC_CYPHER, L=label, R=relType,
-                              p=float(p), q=float(q), d=int(d))
+                              p=float(p), q=float(q), d=int(d), l=int(l))
         for result in results:
             embeddings.append(result)
     print("...generated {} embeddings".format(len(embeddings)))
@@ -514,19 +677,19 @@ easy to extract out just the feature vectors from the
 `extract_embedding` output:
 
 ```python
-def kmeans(embeddings, k=NUM_CLUSTERS, clusterParam="clusterId"):
+def kmeans(embeddings, k=DEFAULT_K, clusterProp=DEFAULT_PROP):
     """
     Given a list of dicts like {"nodeId" 1, "embedding": [1.0, 0.1, ...]},
     generate a list of dicts like {"nodeId": 1, "valueMap": {"clusterId": 2}}
     """
-    print("Performing K-Means clustering (n_clusters={}, clusterParam={})"
-          .format(NUM_CLUSTERS, clusterParam))
+    print("Performing K-Means clustering (k={}, clusterProp='{}')"
+          .format(k, clusterProp))
     X = np.array([e["embedding"] for e in embeddings])
     kmeans = KMeans(n_clusters=int(k)).fit(X)
     results = []
     for idx, cluster in enumerate(kmeans.predict(X)):
         results.append({ "nodeId": embeddings[idx]["nodeId"],
-                         "valueMap": { clusterParam: int(cluster) }})
+                         "valueMap": { clusterProp: int(cluster) }})
     print("...clustering completed.")
     return results
 ```

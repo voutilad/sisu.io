@@ -1,6 +1,6 @@
-#+TITLE: Bringing traditional ML to your Neo4j Graph with node2vec
+#+TITLE: (draft) Bringing traditional ML to your Neo4j Graph with node2vec
 #+DESCRIPTION: Let's take a look at using graph embeddings with traditional ML tools
-#+DATE: 2020-07-09
+#+DATE: 2020-07-08
 #+OPTIONS: toc:1
 #+hugo_auto_set_lastmod: t
 #+hugo_tags: neo4j data-sience

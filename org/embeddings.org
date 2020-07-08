@@ -6,14 +6,17 @@
 #+hugo_tags: neo4j data-sience
 #+hugo_base_dir: ..
 #+hugo_section: posts
+#+hugo_images: ../static/img/node2vec-walk.png
 
 #+CAPTION: Graph Embeddings are Magical!
 #+NAME: fig:node2vec-illustration
 file:../static/img/node2vec-handsketch.png
 
+#+begin_summary
 Departing for once from my posts involving financial fraud topics,
 let's take more of a functional look at an upcoming capability in the
 new Neo4j Graph Data Science library (v1.3) called "graph embeddings."
+#+end_summary
 
 Since most machine learning and artificial intelligence applications
 expect someone to present them just numerical representations of the

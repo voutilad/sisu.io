@@ -5,6 +5,8 @@ theme = "bare"
 enableGitInfo = true
 
 [markup]
+  [markup.goldmark.renderer]
+    unsafe = true
   [markup.highlight]
     codeFences = true
     lineNos = false

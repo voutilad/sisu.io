@@ -140,7 +140,7 @@ like using an anonymous, native graph projection:
     embeddingSize: $d,
     returnFactor: $p,
     inOutFactor: $q,
-    walkLength: $w
+    walkLength: $l
   }) YIELD nodeId, embedding
 #+END_SRC
 
@@ -191,7 +191,8 @@ Since Grover & leskovec don't mention exactly how they arrived at
 their Les Mis output, we're going to try using the following
 methodology:
 
-1. *Populate Neo4j* with the Co-appearance graph -- We've already done this part in [[Loading the Data]] above!
+1. *Populate Neo4j* with the Co-appearance graph -- We've already done
+   this part in [[Loading the Data]] above!
 2. *Refactor the graph* to accomodate unweighted edges -- The current
    alpha node2vec implementation doesn't support weights yet, but we
    can achieve the same result through a structural change.
@@ -492,7 +493,7 @@ typical communities and instead showing the idea of "bridge
 characters" (recall from [[What did they demonstrate?][our previous definitions]] of structural
 equivalence).
 
-*** Remember our walk length parameter?
+*** Remember our Walk Length parameter?
 Earlier I mentioned that the Les Mis network has only 77 nodes. It's
 extremely small by any means. Can you remember what the current
 default /walk length/ parameter is for the node2vec implementation?

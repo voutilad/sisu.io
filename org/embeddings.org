@@ -6,7 +6,7 @@
 #+hugo_tags: neo4j data-sience
 #+hugo_base_dir: ..
 #+hugo_section: posts
-#+hugo_images: ../static/img/node2vec-walk.png
+#+hugo_images: img/node2vec-walk.png
 
 #+CAPTION: Graph Embeddings are Magical!
 #+NAME: fig:node2vec-illustration

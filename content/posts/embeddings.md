@@ -4,7 +4,7 @@ author = ["Dave Voutila"]
 description = "Graph Embeddings are ✨ Magical! ✨"
 date = 2020-07-09
 images = ["img/node2vec-handsketch.png"]
-lastmod = 2020-07-09T09:10:53-04:00
+lastmod = 2020-07-09T09:36:52-04:00
 tags = ["neo4j", "data-science"]
 draft = false
 +++
@@ -25,7 +25,7 @@ draft = false
 </div>
 <!--endtoc-->
 
-<a id="org196ee00"></a>
+<a id="orgb0df14c"></a>
 
 {{< figure src="/img/node2vec-handsketch.png" caption="Figure 1: Graph Embeddings are Magical!" >}}
 
@@ -53,7 +53,7 @@ As the name implies, [node2vec](https://snap.stanford.edu/node2vec/) creates **n
 nodes of a graph, generating a _d_-dimensional feature vector for each
 node where _d_ is a tunable parameter in the algorithm.
 
-<a id="org694a398"></a>
+<a id="orgc4974de"></a>
 
 {{< figure src="/img/node2vec-walk.png" caption="Figure 2: A biased random walk with node2vec (image from the paper)" >}}
 
@@ -105,7 +105,7 @@ the author's published in their case study.
 
 ### Prerequisites {#prerequisites}
 
-Graph a copy of [Neo4j 4.1](https://neo4j.com/download-center), ideally a copy of [Neo4j Desktop](https://neo4j.com/download) to make it
+Grab a copy of [Neo4j 4.1](https://neo4j.com/download-center), ideally a copy of [Neo4j Desktop](https://neo4j.com/download) to make it
 easier for yourself if you're not familiar with installing plugins,
 etc. (See the [getting started guide](https://neo4j.com/developer/neo4j-desktop/) if you're new to this stuff.)
 
@@ -130,7 +130,7 @@ You should now have a graph with 77 nodes (each with a `Character`
 label) connected to one another via a `APPEARED_WITH` relationship
 containing a `weight` numerical property.
 
-<a id="org4b0e4b1"></a>
+<a id="org01b4664"></a>
 
 {{< figure src="/img/lesmis_appearances.svg" caption="Figure 3: Initial overview of our Les Mis network" >}}
 
@@ -201,7 +201,7 @@ the impact to the output of a **_k_-means clustering** algorithm. Let's
 use Neo4j's _node2vec_ algorithm and see how we can reproduce Grover &
 Leskovec's case study in the Les Mis network[^fn:4].
 
-<a id="orgd391dd1"></a>
+<a id="org9bda449"></a>
 
 {{< figure src="/img/node2vec-original.png" caption="Figure 4: Grover and Leskovec's \"complementary visualizations of Les Mis...\" showing homophily (top) and structural equivalence (bottom) where colors represent clusters" >}}
 
@@ -286,7 +286,7 @@ WHERE c1.name IN ['Zephine', 'Dahlia']
 RETURN p
 ```
 
-<a id="org2565567"></a>
+<a id="org1320c39"></a>
 
 {{< figure src="/img/zephy_dahlia_1.svg" caption="Figure 5: Zephine and Dahlia (original)" >}}
 
@@ -304,7 +304,7 @@ UNWIND range(1, r.weight) AS i
 
 Now let's look at Zephone and Dahlia again:
 
-<a id="orge605324"></a>
+<a id="orge368ebc"></a>
 
 {{< figure src="/img/zephy_dahlia_2.svg" caption="Figure 6: Zephine and Dahlia (now including unweighted edges)" >}}
 
@@ -358,7 +358,7 @@ CALL gds.alpha.node2vec.stream({
 What do some of the some of our embeddings results look like? Let's
 take a look in Neo4j Browser:
 
-<a id="org14e86b3"></a>
+<a id="org75a2109"></a>
 
 {{< figure src="/img/example_embeddings.png" caption="Figure 7: Here, have some node embeddings!" >}}
 
@@ -507,7 +507,7 @@ graph. I've done the work for you (you're welcome!) and you can
 download the json file [here](https://raw.githubusercontent.com/neo4j-field/les-miserables/master/LesMis-perspective.json) or find `LesMis-perspective.json` in the
 GitHub project you cloned earlier.
 
-<a id="org0d25cd8"></a>
+<a id="org03b41f8"></a>
 
 {{< figure src="/img/bloom-perspective-import.png" caption="Figure 8: Click the Import button...it's pretty easy!" >}}
 
@@ -520,13 +520,13 @@ need help.
 Let's pull back a view of all the Characters and use the original
 `APPEARED_WITH` relationship type to connect them.
 
-<a id="orgd9af286"></a>
+<a id="org5e227b9"></a>
 
 {{< figure src="/img/bloom-lesmis-query.png" caption="Figure 9: Query for Characters that have a APPEARED\_WITH relationship" >}}
 
 You should get something looking like the following:
 
-<a id="org1926098"></a>
+<a id="orgd4521fc"></a>
 
 {{< figure src="/img/lesmis-network.png" caption="Figure 10: The LesMis Network" >}}
 
@@ -537,7 +537,7 @@ clustering.
 Using the Bloom node style pop-up menus, you can toggle the
 perspective's pre-set rule-based styles:
 
-<a id="orgd5112de"></a>
+<a id="org1ce47c4"></a>
 
 {{< figure src="/img/lesmis-homophily-setting.png" caption="Figure 11: Toggling conditional styling in Bloom" >}}
 
@@ -552,7 +552,7 @@ that leaned towards expressing homophily, we should see some obvious
 communities assigned distinct colors based on the _k_-means clustering
 output.
 
-<a id="orgd737f08"></a>
+<a id="orgc669bb9"></a>
 
 {{< figure src="/img/lesmis-homophily.png" caption="Figure 12: Our homophily results: some nice little clusters!" >}}
 
@@ -566,7 +566,7 @@ How about the structural equivalence results?
 
 Oh...oh no. This looks nothing like what is in the node2vec paper!
 
-<a id="org9df8c3b"></a>
+<a id="orgbf83e54"></a>
 
 {{< figure src="/img/lesmis-not-structured.png" caption="Figure 13: Structural Equivalance results that are...less than ideal!!" >}}
 
@@ -605,7 +605,7 @@ $ python kmeans.py -p 1.0 -q 2.0 -k 3 -C structuredEquivCluster -R UNWEIGHTED_AP
 
 Here's what it looks like now:
 
-<a id="org17965ad"></a>
+<a id="org00f5428"></a>
 
 {{< figure src="/img/lesmis-structured.png" caption="Figure 14: Structural Equivalance, for real this time." >}}
 

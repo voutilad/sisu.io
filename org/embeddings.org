@@ -81,7 +81,7 @@ implementation in the GDS library to create something similar to what
 the author's published in their case study.
 
 ** Prerequisites
-Graph a copy of [[https://neo4j.com/download-center][Neo4j 4.1]], ideally a copy of [[https://neo4j.com/download][Neo4j Desktop]] to make it
+Grab a copy of [[https://neo4j.com/download-center][Neo4j 4.1]], ideally a copy of [[https://neo4j.com/download][Neo4j Desktop]] to make it
 easier for yourself if you're not familiar with installing plugins,
 etc. (See the [[https://neo4j.com/developer/neo4j-desktop/][getting started guide]] if you're new to this stuff.)
 

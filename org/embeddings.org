@@ -1,6 +1,6 @@
-#+TITLE: (draft) Bringing traditional ML to your Neo4j Graph with node2vec
-#+DESCRIPTION: Let's take a look at using graph embeddings with traditional ML tools
-#+DATE: 2020-07-08
+#+TITLE: Bringing traditional ML to your Neo4j Graph with node2vec
+#+DESCRIPTION: Graph Embeddings are ✨ Magical! ✨
+#+DATE: 2020-07-09
 #+OPTIONS: toc:1
 #+hugo_auto_set_lastmod: t
 #+hugo_tags: neo4j data-science
@@ -13,16 +13,16 @@
 file:../static/img/node2vec-handsketch.png
 
 #+begin_summary
-Departing for once from my posts involving financial fraud topics,
-let's take more of a functional look at an upcoming capability in the
-new Neo4j Graph Data Science library (v1.3) called "graph embeddings."
+Departing for once from my posting about financial fraud detection,
+let's take a more functional look at an upcoming capability in the new
+Neo4j Graph Data Science library (v1.3) called "graph embeddings."
 #+end_summary
 
 Since most machine learning and artificial intelligence applications
 expect someone to present them just numerical representations of the
 real world, some non-trivial amount of time is spent turning pictures
-of cats on the internet into 1's and 0's. You can do the same with
-your graphs, but there's a catch.
+of cats on the internet into 1's and 0's. /You can do the same with
+your graphs, but there's a catch./
 
 #+BEGIN_QUOTE
 A disclaimer: this post was written using a pre-release of v1.3 of
@@ -40,7 +40,13 @@ node where /d/ is a tunable parameter in the algorithm.
 #+NAME: fig:random-walk
 file:../static/img/node2vec-walk.png
 
-Ok...so what's the point?
+Ok...so what's the point and *what exactly is a graph embedding?*
+
+** Embed all the Things
+A graph embedding is an expression of the features of a graph in a
+more traditional format used in data science: feature
+vectors. Features of a graph can correspond to things like the
+connectedness (or lack thereof) of a node to others.
 
 Given an arbitrary graph, how can you scalably generate feature
 vectors? For small graphs, we could make something pretty trivial by
@@ -48,14 +54,18 @@ hand. But as graphs grow or are have unknown characteristics you'll
 need a general approach that can learn features from the graph and do
 so at scale.
 
+** How does node2vec do it?
 This is where /node2vec/ comes in. It utilizes a combination of
-feature learning with a random walk to generalize and scale.
+*feature learning* and a *random walk* to generalize and scale.
+
+This means node2vec doesn't:
+- need to know specifics of what your graph represents
+- really care about the size of the graph
+- can be used for embedding arbitrary undirected monopartite graphs
 
 The nitty-gritty is beyond the scope of this blog post, so if you're
 of an academic mindset I recommend reading Grover and Leskovec's paper
 [[https://arxiv.org/pdf/1607.00653.pdf][node2vec: Scalable Feature Learnings for Networks]].
-
-
 
 * The Les Misérables Data Set
 Similar to Neo4j's often demo'd [[https://neo4j.com/blog/graph-of-thrones/][Game of Thrones]] data set, let's take
@@ -66,13 +76,17 @@ the Victor Hugo novel /Les Misérables/.
 And just like Game of Thrones, I haven't read Les Misérables. Shhh!
 #+END_QUOTE
 
+Using the node2vec paper, let's see if we can leverage the Neo4j
+implementation in the GDS library to create something similar to what
+the author's published in their case study.
+
 ** Prerequisites
 Graph a copy of [[https://neo4j.com/download-center][Neo4j 4.1]], ideally a copy of [[https://neo4j.com/download][Neo4j Desktop]] to make it
 easier for yourself if you're not familiar with installing plugins,
 etc. (See the [[https://neo4j.com/developer/neo4j-desktop/][getting started guide]] if you're new to this stuff.)
 
 You'll need the latest supported APOC and Graph Data Science plugins
-as well.
+(v1.3!) as well.
 
 ** Loading the Data
 I've transformed a publicly available data set from Donald Knuth's
@@ -545,6 +559,10 @@ locality would be more definable.
 #+END_QUOTE
 
 * Where can we go from here?
+Depending on your interests, I recommend two different next steps if
+you'd like to learn more (beyond just continuing to use node2vec).
+
+** Operationalizing your Graph Data Science
 One area worth exploring is how to better integrate Neo4j into your
 existing ML workflows and pipelines. In the above example, we just
 used the Python driver and anonymous projections to integrate
@@ -555,6 +573,13 @@ One possibility is leveraging Neo4j's /Apache Kafka/ integration in
 the *neo4j-streams* plugin. Neo4j's Ljubica Lazarevic provides an
 overview in her January 2019 post: /[[https://www.freecodecamp.org/news/how-to-embrace-event-driven-graph-analytics-using-neo4j-and-apache-kafka-474c9f405e06/][How to embrace event-driven graph
 analytics using Neo4j and Apache Kafka]]/
+
+** GraphSAGE
+Another area to explore might be a different graph embedding
+algorithm: *GraphSAGE*[fn:8]
+
+An implementation of GraphSAGE is also available as part of the new
+GDS v1.3 (in alpha form) and takes a different approach from node2vec.
 
 * Appendix: Neo4j's Python Driver and SciKit Learn
 Here are some code snippets that help show what's going on under the
@@ -680,3 +705,5 @@ node2vec paper
 [fn:6] See http://faculty.ucr.edu/~hanneman/nettext/C12_Equivalence.html#structural
 
 [fn:7] Source code is also here: https://github.com/neo4j-field/les-miserables/blob/master/kmeans.py
+
+[fn:8] https://arxiv.org/pdf/1706.02216.pdf

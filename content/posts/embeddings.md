@@ -1,10 +1,10 @@
 +++
-title = "(draft) Bringing traditional ML to your Neo4j Graph with node2vec"
+title = "Bringing traditional ML to your Neo4j Graph with node2vec"
 author = ["Dave Voutila"]
-description = "Let's take a look at using graph embeddings with traditional ML tools"
-date = 2020-07-08
+description = "Graph Embeddings are ✨ Magical! ✨"
+date = 2020-07-09
 images = ["img/node2vec-handsketch.png"]
-lastmod = 2020-07-08T13:47:11-04:00
+lastmod = 2020-07-09T09:09:39-04:00
 tags = ["neo4j", "data-science"]
 draft = false
 +++
@@ -25,21 +25,21 @@ draft = false
 </div>
 <!--endtoc-->
 
-<a id="org90fbd10"></a>
+<a id="orgeb92b0e"></a>
 
 {{< figure src="/img/node2vec-handsketch.png" caption="Figure 1: Graph Embeddings are Magical!" >}}
 
 <summary>
-Departing for once from my posts involving financial fraud topics,
-let's take more of a functional look at an upcoming capability in the
-new Neo4j Graph Data Science library (v1.3) called "graph embeddings."
+Departing for once from my posting about financial fraud detection,
+let's take a more functional look at an upcoming capability in the new
+Neo4j Graph Data Science library (v1.3) called "graph embeddings."
 </summary>
 
 Since most machine learning and artificial intelligence applications
 expect someone to present them just numerical representations of the
 real world, some non-trivial amount of time is spent turning pictures
-of cats on the internet into 1's and 0's. You can do the same with
-your graphs, but there's a catch.
+of cats on the internet into 1's and 0's. _You can do the same with
+your graphs, but there's a catch._
 
 > A disclaimer: this post was written using a pre-release of v1.3 of
 > the Graph Data Science library and some of the examples here may need
@@ -53,11 +53,19 @@ As the name implies, [node2vec](https://snap.stanford.edu/node2vec/) creates **n
 nodes of a graph, generating a _d_-dimensional feature vector for each
 node where _d_ is a tunable parameter in the algorithm.
 
-<a id="org4b38568"></a>
+<a id="org8e799b1"></a>
 
 {{< figure src="/img/node2vec-walk.png" caption="Figure 2: A biased random walk with node2vec (image from the paper)" >}}
 
-Ok...so what's the point?
+Ok...so what's the point and **what exactly is a graph embedding?**
+
+
+### Embed all the Things {#embed-all-the-things}
+
+A graph embedding is an expression of the features of a graph in a
+more traditional format used in data science: feature
+vectors. Features of a graph can correspond to things like the
+connectedness (or lack thereof) of a node to others.
 
 Given an arbitrary graph, how can you scalably generate feature
 vectors? For small graphs, we could make something pretty trivial by
@@ -65,8 +73,17 @@ hand. But as graphs grow or are have unknown characteristics you'll
 need a general approach that can learn features from the graph and do
 so at scale.
 
+
+### How does node2vec do it? {#how-does-node2vec-do-it}
+
 This is where _node2vec_ comes in. It utilizes a combination of
-feature learning with a random walk to generalize and scale.
+**feature learning** and a **random walk** to generalize and scale.
+
+This means node2vec doesn't:
+
+-   need to know specifics of what your graph represents
+-   really care about the size of the graph
+-   can be used for embedding arbitrary undirected monopartite graphs
 
 The nitty-gritty is beyond the scope of this blog post, so if you're
 of an academic mindset I recommend reading Grover and Leskovec's paper
@@ -81,6 +98,10 @@ the Victor Hugo novel _Les Misérables_.
 
 > And just like Game of Thrones, I haven't read Les Misérables. Shhh!
 
+Using the node2vec paper, let's see if we can leverage the Neo4j
+implementation in the GDS library to create something similar to what
+the author's published in their case study.
+
 
 ### Prerequisites {#prerequisites}
 
@@ -89,7 +110,7 @@ easier for yourself if you're not familiar with installing plugins,
 etc. (See the [getting started guide](https://neo4j.com/developer/neo4j-desktop/) if you're new to this stuff.)
 
 You'll need the latest supported APOC and Graph Data Science plugins
-as well.
+(v1.3!) as well.
 
 
 ### Loading the Data {#loading-the-data}
@@ -109,7 +130,7 @@ You should now have a graph with 77 nodes (each with a `Character`
 label) connected to one another via a `APPEARED_WITH` relationship
 containing a `weight` numerical property.
 
-<a id="org21279ee"></a>
+<a id="org3e9d3cf"></a>
 
 {{< figure src="/img/lesmis_appearances.svg" caption="Figure 3: Initial overview of our Les Mis network" >}}
 
@@ -180,7 +201,7 @@ the impact to the output of a **_k_-means clustering** algorithm. Let's
 use Neo4j's _node2vec_ algorithm and see how we can reproduce Grover &
 Leskovec's case study in the Les Mis network[^fn:4].
 
-<a id="orgf323d6f"></a>
+<a id="org5d4bf79"></a>
 
 {{< figure src="/img/node2vec-original.png" caption="Figure 4: Grover and Leskovec's \"complementary visualizations of Les Mis...\" showing homophily (top) and structural equivalence (bottom) where colors represent clusters" >}}
 
@@ -265,7 +286,7 @@ WHERE c1.name IN ['Zephine', 'Dahlia']
 RETURN p
 ```
 
-<a id="org3cc266e"></a>
+<a id="orgfa5b07a"></a>
 
 {{< figure src="/img/zephy_dahlia_1.svg" caption="Figure 5: Zephine and Dahlia (original)" >}}
 
@@ -283,7 +304,7 @@ UNWIND range(1, r.weight) AS i
 
 Now let's look at Zephone and Dahlia again:
 
-<a id="orga0056c0"></a>
+<a id="org6867ff8"></a>
 
 {{< figure src="/img/zephy_dahlia_2.svg" caption="Figure 6: Zephine and Dahlia (now including unweighted edges)" >}}
 
@@ -337,7 +358,7 @@ CALL gds.alpha.node2vec.stream({
 What do some of the some of our embeddings results look like? Let's
 take a look in Neo4j Browser:
 
-<a id="orgd92c4e2"></a>
+<a id="orgf8c557e"></a>
 
 {{< figure src="/img/example_embeddings.png" caption="Figure 7: Here, have some node embeddings!" >}}
 
@@ -486,7 +507,7 @@ graph. I've done the work for you (you're welcome!) and you can
 download the json file [here](https://raw.githubusercontent.com/neo4j-field/les-miserables/master/LesMis-perspective.json) or find `LesMis-perspective.json` in the
 GitHub project you cloned earlier.
 
-<a id="orgc70a465"></a>
+<a id="orgfeff964"></a>
 
 {{< figure src="/img/bloom-perspective-import.png" caption="Figure 8: Click the Import button...it's pretty easy!" >}}
 
@@ -499,13 +520,13 @@ need help.
 Let's pull back a view of all the Characters and use the original
 `APPEARED_WITH` relationship type to connect them.
 
-<a id="orgc4e800f"></a>
+<a id="org7a77853"></a>
 
 {{< figure src="/img/bloom-lesmis-query.png" caption="Figure 9: Query for Characters that have a APPEARED\_WITH relationship" >}}
 
 You should get something looking like the following:
 
-<a id="org61ad79f"></a>
+<a id="orged7ba70"></a>
 
 {{< figure src="/img/lesmis-network.png" caption="Figure 10: The LesMis Network" >}}
 
@@ -516,7 +537,7 @@ clustering.
 Using the Bloom node style pop-up menus, you can toggle the
 perspective's pre-set rule-based styles:
 
-<a id="org007c091"></a>
+<a id="orgeb4f235"></a>
 
 {{< figure src="/img/lesmis-homophily-setting.png" caption="Figure 11: Toggling conditional styling in Bloom" >}}
 
@@ -531,7 +552,7 @@ that leaned towards expressing homophily, we should see some obvious
 communities assigned distinct colors based on the _k_-means clustering
 output.
 
-<a id="orgf6657d7"></a>
+<a id="org72f84db"></a>
 
 {{< figure src="/img/lesmis-homophily.png" caption="Figure 12: Our homophily results: some nice little clusters!" >}}
 
@@ -545,7 +566,7 @@ How about the structural equivalence results?
 
 Oh...oh no. This looks nothing like what is in the node2vec paper!
 
-<a id="orge1d488a"></a>
+<a id="org8d513a0"></a>
 
 {{< figure src="/img/lesmis-not-structured.png" caption="Figure 13: Structural Equivalance results that are...less than ideal!!" >}}
 
@@ -584,7 +605,7 @@ $ python kmeans.py -p 1.0 -q 2.0 -k 3 -C structuredEquivCluster -R UNWEIGHTED_AP
 
 Here's what it looks like now:
 
-<a id="org34e56e7"></a>
+<a id="orgd58cb2a"></a>
 
 {{< figure src="/img/lesmis-structured.png" caption="Figure 14: Structural Equivalance, for real this time." >}}
 
@@ -605,6 +626,12 @@ shared their exact parameters!
 
 ## Where can we go from here? {#where-can-we-go-from-here}
 
+Depending on your interests, I recommend two different next steps if
+you'd like to learn more (beyond just continuing to use node2vec).
+
+
+### Operationalizing your Graph Data Science {#operationalizing-your-graph-data-science}
+
 One area worth exploring is how to better integrate Neo4j into your
 existing ML workflows and pipelines. In the above example, we just
 used the Python driver and anonymous projections to integrate
@@ -615,6 +642,15 @@ One possibility is leveraging Neo4j's _Apache Kafka_ integration in
 the **neo4j-streams** plugin. Neo4j's Ljubica Lazarevic provides an
 overview in her January 2019 post: _[How to embrace event-driven graph
 analytics using Neo4j and Apache Kafka](https://www.freecodecamp.org/news/how-to-embrace-event-driven-graph-analytics-using-neo4j-and-apache-kafka-474c9f405e06/)_
+
+
+### GraphSAGE {#graphsage}
+
+Another area to explore might be a different graph embedding
+algorithm: **GraphSAGE**[^fn:8]
+
+An implementation of GraphSAGE is also available as part of the new
+GDS v1.3 (in alpha form) and takes a different approach from node2vec.
 
 
 ## Appendix: Neo4j's Python Driver and SciKit Learn {#appendix-neo4j-s-python-driver-and-scikit-learn}
@@ -732,3 +768,4 @@ updates properties on the matched node using the `+=` operator and the
 [^fn:5]: See <https://en.wiktionary.org/wiki/homophily>
 [^fn:6]: See <http://faculty.ucr.edu/~hanneman/nettext/C12%5FEquivalence.html#structural>
 [^fn:7]: Source code is also here: <https://github.com/neo4j-field/les-miserables/blob/master/kmeans.py>
+[^fn:8]: <https://arxiv.org/pdf/1706.02216.pdf>

@@ -197,7 +197,8 @@ For *structured equivalence*, the example the authors provide is the
 concept of "bridge characters" that span sub-plots in the Les Mis
 storyline. These characters might not be part of traditional
 communities, but act as ways to connect disparate communities. (You
-might recall my
+might recall in my [[https://www.sisu.io/posts/paysim-part3/][PaySim fraud post]] the concept of detecting
+"lyncpins" in a fraud network...sounds sort of similar!)
 
 Let's see if we can use the parameters they mentioned and a /k/-means
 implementation to recreate something similar to their output in
